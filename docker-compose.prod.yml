@@ -1,0 +1,31 @@
+# Docker Compose cho production server
+# Đặt file này trên server tại ~/dbflow-ai/docker-compose.prod.yml
+
+services:
+  dbflow-ai:
+    # Image được push từ GitHub Actions, IMAGE_NAME được truyền qua .env
+    image: ghcr.io/${IMAGE_NAME}:latest
+    container_name: dbflow-ai
+    restart: unless-stopped
+    ports:
+      - "2024:8000" # LangGraph Server mặc định chạy port 8000 trong container
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - LANGSMITH_TRACING=${LANGSMITH_TRACING:-true}
+      - LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY:-}
+      - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-dbflow-ai}
+      - LANGSERVE_HOST=0.0.0.0
+      - LANGSERVE_PORT=8000
+    volumes:
+      # Persist ChromaDB data (nếu dùng RAG)
+      - chroma_data:/app/chroma_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ok"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  chroma_data:

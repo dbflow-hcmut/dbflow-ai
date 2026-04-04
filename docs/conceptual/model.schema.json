@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://example.com/conceptual/model.schema.json",
+  "title": "Conceptual ER/EER Model",
+  "type": "object",
+  "required": ["model", "entities", "relationships"],
+  "additionalProperties": false,
+
+  "properties": {
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^cid_" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "notes": { "type": "string" }
+      }
+    },
+
+    "entities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entity" }
+    },
+
+    "relationships": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relationship" }
+    },
+
+    "generalizations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/generalization" }
+    },
+
+    "categories": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/category" }
+    },
+
+    "notes": {
+      "description": "General notes about the model.",
+      "type": "string"
+    },
+
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "required": ["id", "name", "attributes"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^cid_" },
+
+        "name": { "type": "string" },
+
+        "kind": {
+          "type": "string",
+          "enum": ["strong", "weak"],
+          "default": "strong"
+        },
+
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attribute" }
+        },
+
+        "notes": { "type": "string" }
+      }
+    },
+
+    "attribute": {
+      "description": "Entity or relationship attribute.",
+      "type": "object",
+      "required": ["id", "name", "kind", "isKey"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^cid_" },
+
+        "name": { "type": "string" },
+
+        "kind": {
+          "type": "string",
+          "enum": ["simple", "composite", "multi_valued", "complex", "derived"]
+        },
+
+        "isKey": { "type": "boolean", "default": false },
+
+        "semantics": { "type": "array", "items": { "type": "string" } },
+
+        "components": {
+          "description": "For composite/complex attributes.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "kind"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^cid_" },
+
+              "name": { "type": "string" },
+
+              "kind": {
+                "type": "string",
+                "enum": ["simple"]
+              }
+            }
+          }
+        },
+
+        "derivation": { "type": "string" },
+
+        "notes": { "type": "string" }
+      }
+    },
+
+    "relationship": {
+      "type": "object",
+      "required": ["id", "name", "type", "ends"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^cid_" },
+
+        "name": { "type": "string" },
+
+        "type": {
+          "type": "string",
+          "enum": ["association", "identifying"],
+          "default": "association"
+        },
+
+        "arity": { "type": "integer", "minimum": 1 },
+
+        "ends": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/relEnd" }
+        },
+
+        "attributes": {
+          "description": "Attributes owned by the relationship (esp. n-ary).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/attribute" }
+        },
+
+        "semantics": { "type": "string" },
+
+        "notes": { "type": "string" }
+      }
+    },
+
+    "relEnd": {
+      "type": "object",
+      "required": ["entityId", "cardinality"],
+      "additionalProperties": false,
+      "properties": {
+        "entityId": { "type": "string", "pattern": "^cid_" },
+
+        "role": { "type": "string" },
+
+        "cardinality": {
+          "type": "string"
+        },
+
+        "optional": { "type": "boolean" }
+      }
+    },
+
+    "generalization": {
+      "description": "Subtype/Supertype (is-a).",
+      "type": "object",
+      "required": ["id", "parentEntityId", "childEntityIds", "constraints"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^cid_" },
+        "parentEntityId": { "type": "string", "pattern": "^cid_" },
+        "childEntityIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^cid_" }
+        },
+        "categoryBy": { "type": "string" },
+        "constraints": {
+          "type": "object",
+          "required": ["disjointness", "completeness"],
+          "additionalProperties": false,
+          "properties": {
+            "disjointness": {
+              "type": "string",
+              "enum": ["disjoint", "overlap"]
+            },
+            "completeness": { "type": "string", "enum": ["total", "partial"] }
+          }
+        }
+      }
+    },
+
+    "category": {
+      "type": "object",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "categoryEntityId",
+          "superclassEntityIds",
+          "completeness"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^cid_" },
+
+          "categoryEntityId": {
+            "type": "string",
+            "pattern": "^cid_"
+          },
+
+          "superclassEntityIds": {
+            "type": "array",
+            "minItems": 2,
+            "items": { "type": "string", "pattern": "^cid_" }
+          },
+
+          "completeness": {
+            "type": "string",
+            "enum": ["total", "partial"]
+          },
+
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

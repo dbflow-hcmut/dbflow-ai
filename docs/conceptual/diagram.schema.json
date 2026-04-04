@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://example.com/conceptual/diagram.schema.json",
+  "title": "Conceptual ER/EER Diagram",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["diagram"],
+  "properties": {
+    "diagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "nodes", "edges"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^cid_" },
+        "name": { "type": "string" },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "zoom": { "type": "number", "minimum": 0.1, "maximum": 5.0 },
+            "gridSize": { "type": "integer", "minimum": 2 },
+            "snapToGrid": { "type": "boolean" }
+          }
+        },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
+      }
+    }
+  },
+
+  "$defs": {
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+    },
+
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["w", "h"],
+      "properties": {
+        "w": { "type": "number", "minimum": 20 },
+        "h": { "type": "number", "minimum": 20 }
+      }
+    },
+
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "position", "size"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^cid_" },
+
+        "type": {
+          "type": "string",
+          "enum": [
+            "entity",
+            "relationship",
+            "attribute",
+            "isaCircle",
+            "unionCircle",
+            "note"
+          ]
+        },
+
+        "position": { "$ref": "#/$defs/point" },
+        "size": { "$ref": "#/$defs/size" },
+
+        "zIndex": { "type": "integer", "minimum": 0 },
+
+        "style": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "class": { "type": "string" },
+            "stroke": { "type": ["string", "null"] },
+            "fill": { "type": ["string", "null"] }
+          }
+        },
+
+        "name": { "type": "string" },
+
+        "entityId": { "type": "string", "pattern": "^cid_" },
+        "entityRender": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "doubleStroke": { "type": "boolean" }
+          }
+        },
+
+        "relationshipId": { "type": "string", "pattern": "^cid_" },
+        "relationshipRender": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "doubleStroke": { "type": "boolean" }
+          }
+        },
+
+        "attributeId": { "type": "string", "pattern": "^cid_" },
+        "attributeRender": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "doubleEllipse": { "type": "boolean" },
+            "dashed": { "type": "boolean" },
+            "underline": { "type": "boolean" },
+            "underlineStyle": {
+              "type": "string",
+              "enum": ["solid", "dashed"],
+              "default": "solid"
+            }
+          },
+
+          "isaCircle": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "symbol": { "type": "string", "enum": ["d", "o"], "default": "d" }
+            }
+          },
+
+          "unionCircle": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "symbol": { "type": "string", "enum": ["U"], "default": "U" },
+              "categoryId": { "type": "string", "pattern": "^cid_" }
+            }
+          },
+
+          "text": { "type": "string" }
+        },
+
+        "allOf": [
+          {
+            "if": { "properties": { "type": { "const": "entity" } } },
+            "then": { "required": ["entityId"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "relationship" } } },
+            "then": { "required": ["relationshipId"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "attribute" } } },
+            "then": { "required": ["attributeId"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "isaCircle" } } },
+            "then": { "required": ["isaCircle"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "unionCircle" } } },
+            "then": { "required": ["unionCircle"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "note" } } },
+            "then": { "required": ["text"] }
+          }
+        ]
+      }
+    },
+
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "from", "to"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^cid_" },
+
+        "type": {
+          "type": "string",
+          "enum": [
+            "participation",
+            "attrOf",
+            "componentOf",
+            "isaParent",
+            "isaChild",
+            "categoryLink",
+            "categoryMember"
+          ]
+        },
+
+        "relationshipId": { "type": "string", "pattern": "^cid_" },
+        "generalizationId": { "type": "string", "pattern": "^cid_" },
+        "categoryId": { "type": "string", "pattern": "^cid_" },
+
+        "from": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nodeId"],
+          "properties": { "nodeId": { "type": "string", "pattern": "^cid_" } }
+        },
+        "to": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nodeId"],
+          "properties": { "nodeId": { "type": "string", "pattern": "^cid_" } }
+        },
+
+        "labels": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "nearFrom": { "type": "string" },
+            "center": { "type": "string" },
+            "nearTo": { "type": "string" }
+          }
+        },
+
+        "endStyle": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "doubleLine": { "type": "boolean" },
+                "marker": {
+                  "type": "string",
+                  "enum": ["none", "one", "many"],
+                  "default": "none"
+                }
+              }
+            },
+            "to": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "doubleLine": { "type": "boolean" },
+                "marker": {
+                  "type": "string",
+                  "enum": ["none", "one", "many"],
+                  "default": "none"
+                }
+              }
+            }
+          }
+        }
+      },
+
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "participation" } } },
+          "then": { "required": ["relationshipId"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "isaParent" } } },
+          "then": { "required": ["generalizationId"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "isaChild" } } },
+          "then": { "required": ["generalizationId"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "categoryLink" } } },
+          "then": { "required": ["categoryId"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "categoryMember" } } },
+          "then": { "required": ["categoryId"] }
+        }
+      ]
+    }
+  }
+}

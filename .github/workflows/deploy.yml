@@ -1,0 +1,145 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: # Cho phép chạy thủ công từ GitHub UI
+
+permissions:
+  contents: read
+  packages: write # Cần để push image lên GHCR
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }} # e.g. username/dbflow-ai
+
+jobs:
+  # ── Job 1: Chạy tests trước khi deploy ────────────────────────────────────
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv venv
+          uv pip install -r pyproject.toml
+          uv pip install pytest
+      - name: Run unit tests
+        run: uv run pytest tests/unit_tests
+
+  # ── Job 2: Build Docker image & push lên GHCR ─────────────────────────────
+  build-and-push:
+    name: Build & Push Image
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install LangGraph CLI
+        run: pip install "langgraph-cli[inmem]"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build image with LangGraph CLI
+        run: |
+          langgraph build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                          -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Push image to GHCR
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  # ── Job 3: SSH vào server, pull image mới & restart ────────────────────────
+  deploy:
+    name: Deploy to Server
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy docker-compose to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          source: "docker-compose.prod.yml"
+          target: "~/dbflow-ai/"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          envs: GOOGLE_API_KEY,LANGSMITH_TRACING,LANGSMITH_ENDPOINT,LANGSMITH_API_KEY,LANGSMITH_PROJECT,REGISTRY,IMAGE_NAME,GHCR_TOKEN,GHCR_USER
+          script: |
+            cd ~/dbflow-ai
+
+            # Login vào GHCR
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+
+            # Pull image mới nhất
+            docker pull ${REGISTRY}/${IMAGE_NAME}:latest
+
+            # Ghi .env từ GitHub Secrets (luôn cập nhật mỗi lần deploy)
+            cat > .env << EOF
+            IMAGE_NAME=${IMAGE_NAME}
+            GOOGLE_API_KEY=${GOOGLE_API_KEY}
+            LANGSMITH_TRACING=${LANGSMITH_TRACING}
+            LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT}
+            LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+            LANGSMITH_PROJECT=${LANGSMITH_PROJECT}
+            EOF
+
+            # Restart services — docker-compose đọc .env để lấy IMAGE_NAME + env vars
+            docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
+
+            # Cleanup old images
+            docker image prune -f
+
+            echo "✅ Deploy completed successfully!"
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          LANGSMITH_TRACING: ${{ secrets.LANGSMITH_TRACING }}
+          LANGSMITH_ENDPOINT: ${{ secrets.LANGSMITH_ENDPOINT }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
+          REGISTRY: ghcr.io
+          IMAGE_NAME: ${{ github.repository }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}

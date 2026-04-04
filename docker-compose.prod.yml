@@ -17,9 +17,12 @@ services:
       - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-dbflow-ai}
       - LANGSERVE_HOST=0.0.0.0
       - LANGSERVE_PORT=8000
+      - POSTGRES_URI=
     volumes:
       # Persist ChromaDB data (nếu dùng RAG)
       - chroma_data:/app/chroma_data
+      # Persist LangGraph SQLite database
+      - langgraph_data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/ok"]
       interval: 30s
@@ -29,3 +32,4 @@ services:
 
 volumes:
   chroma_data:
+  langgraph_data:

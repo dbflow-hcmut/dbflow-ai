@@ -20,6 +20,7 @@ source .venv/bin/activate
 
 ```bash
 pip install "langgraph-cli[inmem]" langchain-google-genai python-dotenv
+pip install -e .
 ```
 
 ---

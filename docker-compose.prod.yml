@@ -2,11 +2,45 @@
 # Đặt file này trên server tại ~/dbflow-ai/docker-compose.prod.yml
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dbflow-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=langgraph
+      - POSTGRES_USER=langgraph
+      - POSTGRES_PASSWORD=langgraph_secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langgraph"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dbflow-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   dbflow-ai:
     # Image được push từ GitHub Actions, IMAGE_NAME được truyền qua .env
     image: ghcr.io/${IMAGE_NAME}:latest
     container_name: dbflow-ai
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "2024:8000" # LangGraph Server mặc định chạy port 8000 trong container
     environment:
@@ -17,13 +51,11 @@ services:
       - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-dbflow-ai}
       - LANGSERVE_HOST=0.0.0.0
       - LANGSERVE_PORT=8000
-      - POSTGRES_URI=
-      - REDIS_URI=
+      - POSTGRES_URI=postgresql://langgraph:langgraph_secret@postgres:5432/langgraph
+      - REDIS_URI=redis://redis:6379
     volumes:
       # Persist ChromaDB data (nếu dùng RAG)
       - chroma_data:/app/chroma_data
-      # Persist LangGraph SQLite database
-      - langgraph_data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/ok"]
       interval: 30s
@@ -32,5 +64,6 @@ services:
       start_period: 40s
 
 volumes:
+  postgres_data:
+  redis_data:
   chroma_data:
-  langgraph_data:

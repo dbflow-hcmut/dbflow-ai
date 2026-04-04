@@ -73,13 +73,25 @@ jobs:
 
       - name: Build image with LangGraph CLI
         run: |
-          langgraph build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-                          -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          # LangGraph build tự động tag với commit SHA
+          langgraph build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          
+          # Lấy image vừa build và tag lại với latest
+          echo "🔍 Finding built image..."
+          BUILT_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | head -n 1)
+          echo "Found: $BUILT_IMAGE"
+          
+          echo "🏷️  Tagging as latest..."
+          docker tag $BUILT_IMAGE ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          
+          echo "✅ Image ready:"
+          docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Push image to GHCR
         run: |
+          echo "🚀 Pushing image to GHCR..."
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          echo "✅ Image pushed successfully!"
 
   # ── Job 3: SSH vào server, pull image mới & restart ────────────────────────
   deploy:

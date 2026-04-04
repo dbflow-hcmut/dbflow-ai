@@ -18,6 +18,7 @@ services:
       - LANGSERVE_HOST=0.0.0.0
       - LANGSERVE_PORT=8000
       - POSTGRES_URI=
+      - REDIS_URI=
     volumes:
       # Persist ChromaDB data (nếu dùng RAG)
       - chroma_data:/app/chroma_data

@@ -19,7 +19,7 @@ load_dotenv()
 def _make_router_model() -> ChatGoogleGenerativeAI:
     """Create a fast Gemini model wired to return ``RouterOutput``."""
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite",
+        model=os.getenv("API_MODEL"),
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0,
     )

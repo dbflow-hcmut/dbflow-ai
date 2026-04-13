@@ -1,0 +1,1290 @@
+{
+  "model": {
+    "id": "cid_edu_enterprise_platform",
+    "name": "Nền tảng quản lý tích hợp Giáo dục và Doanh nghiệp",
+    "version": 1,
+    "notes": "Conceptual model for an integrated education and enterprise management platform, covering user management, organizational structure, course delivery, project management, and communication features."
+  },
+  "entities": [
+    {
+      "id": "cid_user",
+      "name": "User",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_user_id", "name": "user_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_username", "name": "username", "kind": "simple", "isKey": false, "semantics": ["unique_identifier"] },
+        { "id": "cid_email", "name": "email", "kind": "simple", "isKey": false, "semantics": ["unique_identifier", "contact_info"] },
+        { "id": "cid_password_hash", "name": "password_hash", "kind": "simple", "isKey": false, "semantics": ["security"] },
+        { "id": "cid_first_name", "name": "first_name", "kind": "simple", "isKey": false },
+        { "id": "cid_last_name", "name": "last_name", "kind": "simple", "isKey": false },
+        { "id": "cid_full_name", "name": "full_name", "kind": "derived", "isKey": false, "derivation": "CONCAT(first_name, ' ', last_name)" },
+        { "id": "cid_dob", "name": "dob", "kind": "simple", "isKey": false, "semantics": ["date_of_birth"] },
+        { "id": "cid_gender", "name": "gender", "kind": "simple", "isKey": false },
+        { "id": "cid_phone_numbers", "name": "phone_numbers", "kind": "multi_valued", "isKey": false, "semantics": ["contact_info"] },
+        { "id": "cid_avatar_url", "name": "avatar_url", "kind": "simple", "isKey": false, "semantics": ["media_url"] },
+        {
+          "id": "cid_address",
+          "name": "address",
+          "kind": "composite",
+          "isKey": false,
+          "components": [
+            { "id": "cid_address_street", "name": "street", "kind": "simple" },
+            { "id": "cid_address_city", "name": "city", "kind": "simple" },
+            { "id": "cid_address_state_province", "name": "state_province", "kind": "simple" },
+            { "id": "cid_address_postal_code", "name": "postal_code", "kind": "simple" },
+            { "id": "cid_address_country", "name": "country", "kind": "simple" }
+          ],
+          "semantics": ["location"]
+        },
+        { "id": "cid_timezone", "name": "timezone", "kind": "simple", "isKey": false },
+        { "id": "cid_language", "name": "language", "kind": "simple", "isKey": false },
+        { "id": "cid_status", "name": "status", "kind": "simple", "isKey": false, "semantics": ["account_status"] },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_last_login_at", "name": "last_login_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_failed_login_attempts", "name": "failed_login_attempts", "kind": "simple", "isKey": false },
+        { "id": "cid_email_verified", "name": "email_verified", "kind": "simple", "isKey": false },
+        { "id": "cid_two_factor_enabled", "name": "two_factor_enabled", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_student",
+      "name": "Student",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_student_id", "name": "student_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_enrollment_date", "name": "enrollment_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_major", "name": "major", "kind": "simple", "isKey": false },
+        { "id": "cid_gpa", "name": "gpa", "kind": "derived", "isKey": false, "derivation": "AVG(Enrollment.grade)" },
+        { "id": "cid_student_status", "name": "student_status", "kind": "simple", "isKey": false },
+        { "id": "cid_expected_graduation_date", "name": "expected_graduation_date", "kind": "simple", "isKey": false, "semantics": ["date"] }
+      ]
+    },
+    {
+      "id": "cid_instructor",
+      "name": "Instructor",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_instructor_id", "name": "instructor_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_specialization", "name": "specialization", "kind": "multi_valued", "isKey": false },
+        { "id": "cid_hire_date", "name": "hire_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_bio", "name": "bio", "kind": "simple", "isKey": false },
+        { "id": "cid_office_location", "name": "office_location", "kind": "simple", "isKey": false, "semantics": ["location"] },
+        { "id": "cid_research_interests", "name": "research_interests", "kind": "multi_valued", "isKey": false },
+        { "id": "cid_is_active", "name": "is_active", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_administrator",
+      "name": "Administrator",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_admin_id", "name": "admin_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_admin_level", "name": "admin_level", "kind": "simple", "isKey": false },
+        { "id": "cid_department_managed", "name": "department_managed", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_start_date", "name": "start_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_responsibilities", "name": "responsibilities", "kind": "multi_valued", "isKey": false },
+        { "id": "cid_is_super_admin", "name": "is_super_admin", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_employee",
+      "name": "Employee",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_employee_id", "name": "employee_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_job_title", "name": "job_title", "kind": "simple", "isKey": false },
+        { "id": "cid_department_id", "name": "department_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_hire_date", "name": "hire_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_salary", "name": "salary", "kind": "simple", "isKey": false, "semantics": ["currency"] },
+        { "id": "cid_employee_status", "name": "employee_status", "kind": "simple", "isKey": false },
+        { "id": "cid_manager_user_id", "name": "manager_user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] }
+      ]
+    },
+    {
+      "id": "cid_organization",
+      "name": "Organization",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_organization_id", "name": "organization_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_code", "name": "code", "kind": "simple", "isKey": false, "semantics": ["unique_identifier"] },
+        { "id": "cid_tax_code", "name": "tax_code", "kind": "simple", "isKey": false, "semantics": ["unique_identifier"] },
+        { "id": "cid_industry", "name": "industry", "kind": "simple", "isKey": false },
+        { "id": "cid_size", "name": "size", "kind": "simple", "isKey": false },
+        { "id": "cid_website", "name": "website", "kind": "simple", "isKey": false, "semantics": ["url"] },
+        { "id": "cid_email", "name": "email", "kind": "simple", "isKey": false, "semantics": ["contact_info"] },
+        { "id": "cid_phone", "name": "phone", "kind": "simple", "isKey": false, "semantics": ["contact_info"] },
+        {
+          "id": "cid_org_address",
+          "name": "address",
+          "kind": "composite",
+          "isKey": false,
+          "components": [
+            { "id": "cid_org_address_street", "name": "street", "kind": "simple" },
+            { "id": "cid_org_address_city", "name": "city", "kind": "simple" },
+            { "id": "cid_org_address_state_province", "name": "state_province", "kind": "simple" },
+            { "id": "cid_org_address_postal_code", "name": "postal_code", "kind": "simple" },
+            { "id": "cid_org_address_country", "name": "country", "kind": "simple" }
+          ],
+          "semantics": ["location"]
+        },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_status", "name": "status", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_logo_url", "name": "logo_url", "kind": "simple", "isKey": false, "semantics": ["media_url"] }
+      ]
+    },
+    {
+      "id": "cid_department",
+      "name": "Department",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_department_id", "name": "department_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_organization_id", "name": "organization_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_manager_id", "name": "manager_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_budget", "name": "budget", "kind": "simple", "isKey": false, "semantics": ["currency"] },
+        { "id": "cid_location", "name": "location", "kind": "simple", "isKey": false, "semantics": ["location"] }
+      ]
+    },
+    {
+      "id": "cid_role",
+      "name": "Role",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_role_id", "name": "role_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_priority", "name": "priority", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_is_system_role", "name": "is_system_role", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_permission",
+      "name": "Permission",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_permission_id", "name": "permission_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_code", "name": "code", "kind": "simple", "isKey": false, "semantics": ["unique_identifier"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_module", "name": "module", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_user_role",
+      "name": "User_Role",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_user_role_user_id", "name": "user_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_user_role_role_id", "name": "role_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_assigned_at", "name": "assigned_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_assigned_by_user_id", "name": "assigned_by_user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_revoked_at", "name": "revoked_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_role_permission",
+      "name": "Role_Permission",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_role_permission_role_id", "name": "role_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_role_permission_permission_id", "name": "permission_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_granted_at", "name": "granted_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_granted_by_user_id", "name": "granted_by_user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] }
+      ]
+    },
+    {
+      "id": "cid_course",
+      "name": "Course",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_course_id", "name": "course_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_title", "name": "title", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_category", "name": "category", "kind": "simple", "isKey": false },
+        { "id": "cid_level", "name": "level", "kind": "simple", "isKey": false },
+        { "id": "cid_language", "name": "language", "kind": "simple", "isKey": false },
+        { "id": "cid_duration_hours", "name": "duration_hours", "kind": "derived", "isKey": false, "derivation": "SUM(Lesson.duration_minutes) / 60" },
+        { "id": "cid_price", "name": "price", "kind": "simple", "isKey": false, "semantics": ["currency"] },
+        { "id": "cid_discount_percent", "name": "discount_percent", "kind": "simple", "isKey": false },
+        { "id": "cid_final_price", "name": "final_price", "kind": "derived", "isKey": false, "derivation": "price * (1 - discount_percent / 100)" },
+        { "id": "cid_rating_avg", "name": "rating_avg", "kind": "derived", "isKey": false, "derivation": "AVG(Course_Rating.rating_value)" },
+        { "id": "cid_rating_count", "name": "rating_count", "kind": "simple", "isKey": false },
+        { "id": "cid_created_by", "name": "created_by", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_status", "name": "status", "kind": "simple", "isKey": false },
+        { "id": "cid_thumbnail_url", "name": "thumbnail_url", "kind": "simple", "isKey": false, "semantics": ["media_url"] },
+        { "id": "cid_published_at", "name": "published_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_lesson",
+      "name": "Lesson",
+      "kind": "weak",
+      "attributes": [
+        { "id": "cid_lesson_id", "name": "lesson_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_course_id", "name": "course_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_title", "name": "title", "kind": "simple", "isKey": false },
+        { "id": "cid_content", "name": "content", "kind": "simple", "isKey": false },
+        { "id": "cid_video_url", "name": "video_url", "kind": "simple", "isKey": false, "semantics": ["media_url"] },
+        { "id": "cid_duration_minutes", "name": "duration_minutes", "kind": "simple", "isKey": false },
+        { "id": "cid_order_index", "name": "order_index", "kind": "simple", "isKey": false },
+        { "id": "cid_is_preview", "name": "is_preview", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_lesson_type", "name": "lesson_type", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_material",
+      "name": "Material",
+      "kind": "weak",
+      "attributes": [
+        { "id": "cid_material_id", "name": "material_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_lesson_id", "name": "lesson_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_file_url", "name": "file_url", "kind": "simple", "isKey": false, "semantics": ["media_url"] },
+        { "id": "cid_file_type", "name": "file_type", "kind": "simple", "isKey": false },
+        { "id": "cid_file_size_kb", "name": "file_size_kb", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_uploaded_at", "name": "uploaded_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_uploaded_by", "name": "uploaded_by", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] }
+      ]
+    },
+    {
+      "id": "cid_assignment",
+      "name": "Assignment",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_assignment_id", "name": "assignment_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_course_id", "name": "course_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_title", "name": "title", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_max_score", "name": "max_score", "kind": "simple", "isKey": false },
+        { "id": "cid_due_date", "name": "due_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_assignment_type", "name": "assignment_type", "kind": "simple", "isKey": false },
+        { "id": "cid_instructions", "name": "instructions", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_submission",
+      "name": "Submission",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_submission_id", "name": "submission_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_assignment_id", "name": "assignment_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_user_id", "name": "user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_content", "name": "content", "kind": "simple", "isKey": false },
+        { "id": "cid_file_url", "name": "file_url", "kind": "simple", "isKey": false, "semantics": ["media_url"] },
+        { "id": "cid_score", "name": "score", "kind": "simple", "isKey": false },
+        { "id": "cid_feedback", "name": "feedback", "kind": "simple", "isKey": false },
+        { "id": "cid_submitted_at", "name": "submitted_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_graded_at", "name": "graded_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_grader_id", "name": "grader_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_status", "name": "status", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_exam",
+      "name": "Exam",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_exam_id", "name": "exam_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_course_id", "name": "course_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_title", "name": "title", "kind": "simple", "isKey": false },
+        { "id": "cid_duration_minutes", "name": "duration_minutes", "kind": "simple", "isKey": false },
+        { "id": "cid_total_score", "name": "total_score", "kind": "simple", "isKey": false },
+        { "id": "cid_pass_score", "name": "pass_score", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_instructions", "name": "instructions", "kind": "simple", "isKey": false },
+        { "id": "cid_is_published", "name": "is_published", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_question",
+      "name": "Question",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_question_id", "name": "question_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_exam_id", "name": "exam_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_content", "name": "content", "kind": "simple", "isKey": false },
+        { "id": "cid_type", "name": "type", "kind": "simple", "isKey": false },
+        { "id": "cid_difficulty", "name": "difficulty", "kind": "simple", "isKey": false },
+        { "id": "cid_score_points", "name": "score_points", "kind": "simple", "isKey": false },
+        { "id": "cid_image_url", "name": "image_url", "kind": "simple", "isKey": false, "semantics": ["media_url"] },
+        { "id": "cid_explanation", "name": "explanation", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_answer",
+      "name": "Answer",
+      "kind": "weak",
+      "attributes": [
+        { "id": "cid_answer_id", "name": "answer_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_question_id", "name": "question_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_content", "name": "content", "kind": "simple", "isKey": false },
+        { "id": "cid_is_correct", "name": "is_correct", "kind": "simple", "isKey": false },
+        { "id": "cid_feedback_text", "name": "feedback_text", "kind": "simple", "isKey": false },
+        { "id": "cid_order_index", "name": "order_index", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_enrollment",
+      "name": "Enrollment",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_enrollment_id", "name": "enrollment_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_user_id", "name": "user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_course_id", "name": "course_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_enrolled_at", "name": "enrolled_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_progress_percent", "name": "progress_percent", "kind": "simple", "isKey": false },
+        { "id": "cid_status", "name": "status", "kind": "simple", "isKey": false },
+        { "id": "cid_completed_at", "name": "completed_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_last_accessed_at", "name": "last_accessed_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_grade", "name": "grade", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_certificate",
+      "name": "Certificate",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_certificate_id", "name": "certificate_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_user_id", "name": "user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_course_id", "name": "course_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_issued_at", "name": "issued_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_certificate_url", "name": "certificate_url", "kind": "simple", "isKey": false, "semantics": ["url"] },
+        { "id": "cid_grade", "name": "grade", "kind": "simple", "isKey": false },
+        { "id": "cid_expiration_date", "name": "expiration_date", "kind": "simple", "isKey": false, "semantics": ["date"] },
+        { "id": "cid_issuer_name", "name": "issuer_name", "kind": "simple", "isKey": false },
+        { "id": "cid_unique_code", "name": "unique_code", "kind": "simple", "isKey": false, "semantics": ["unique_identifier"] }
+      ]
+    },
+    {
+      "id": "cid_skill",
+      "name": "Skill",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_skill_id", "name": "skill_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_category", "name": "category", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_is_verified", "name": "is_verified", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_user_skill",
+      "name": "User_Skill",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_user_skill_user_id", "name": "user_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_user_skill_skill_id", "name": "skill_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_level", "name": "level", "kind": "simple", "isKey": false },
+        { "id": "cid_years_of_experience", "name": "years_of_experience", "kind": "simple", "isKey": false },
+        { "id": "cid_last_used_at", "name": "last_used_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_verified_by_user_id", "name": "verified_by_user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_verification_date", "name": "verification_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_competency",
+      "name": "Competency",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_competency_id", "name": "competency_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_level_required", "name": "level_required", "kind": "simple", "isKey": false },
+        { "id": "cid_category", "name": "category", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_project",
+      "name": "Project",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_project_id", "name": "project_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_organization_id", "name": "organization_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_start_date", "name": "start_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_end_date", "name": "end_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_budget_amount", "name": "budget_amount", "kind": "simple", "isKey": false, "semantics": ["currency"] },
+        { "id": "cid_status", "name": "status", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_created_by", "name": "created_by", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_actual_cost", "name": "actual_cost", "kind": "simple", "isKey": false, "semantics": ["currency"] }
+      ]
+    },
+    {
+      "id": "cid_project_member",
+      "name": "Project_Member",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_project_member_project_id", "name": "project_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_project_member_user_id", "name": "user_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_role_in_project", "name": "role_in_project", "kind": "simple", "isKey": false },
+        { "id": "cid_joined_at", "name": "joined_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_left_at", "name": "left_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_is_active", "name": "is_active", "kind": "simple", "isKey": false },
+        { "id": "cid_assigned_by_user_id", "name": "assigned_by_user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] }
+      ]
+    },
+    {
+      "id": "cid_task",
+      "name": "Task",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_task_id", "name": "task_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_project_id", "name": "project_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_title", "name": "title", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_assigned_to_user_id", "name": "assigned_to_user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_priority", "name": "priority", "kind": "simple", "isKey": false },
+        { "id": "cid_status", "name": "status", "kind": "simple", "isKey": false },
+        { "id": "cid_start_date", "name": "start_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_due_date", "name": "due_date", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_completed_at", "name": "completed_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_estimate_hours", "name": "estimate_hours", "kind": "simple", "isKey": false },
+        { "id": "cid_actual_hours", "name": "actual_hours", "kind": "simple", "isKey": false },
+        { "id": "cid_parent_task_id", "name": "parent_task_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_created_by_user_id", "name": "created_by_user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] }
+      ]
+    },
+    {
+      "id": "cid_comment",
+      "name": "Comment",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_comment_id", "name": "comment_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_user_id", "name": "user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_content", "name": "content", "kind": "simple", "isKey": false },
+        { "id": "cid_target_type", "name": "target_type", "kind": "simple", "isKey": false, "notes": "Type of entity being commented on (e.g., 'course', 'lesson', 'project', 'task', 'submission')" },
+        { "id": "cid_target_id", "name": "target_id", "kind": "simple", "isKey": false, "notes": "ID of the entity being commented on" },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_parent_comment_id", "name": "parent_comment_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_course_id_fk", "name": "course_id_fk", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for comments on courses" },
+        { "id": "cid_lesson_id_fk", "name": "lesson_id_fk", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for comments on lessons" },
+        { "id": "cid_project_id_fk", "name": "project_id_fk", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for comments on projects" },
+        { "id": "cid_task_id_fk", "name": "task_id_fk", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for comments on tasks" },
+        { "id": "cid_submission_id_fk", "name": "submission_id_fk", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for comments on submissions" }
+      ]
+    },
+    {
+      "id": "cid_attachment",
+      "name": "Attachment",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_attachment_id", "name": "attachment_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false },
+        { "id": "cid_file_url", "name": "file_url", "kind": "simple", "isKey": false, "semantics": ["media_url"] },
+        { "id": "cid_file_type", "name": "file_type", "kind": "simple", "isKey": false },
+        { "id": "cid_file_size_kb", "name": "file_size_kb", "kind": "simple", "isKey": false },
+        { "id": "cid_uploaded_by_user_id", "name": "uploaded_by_user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_target_type", "name": "target_type", "kind": "simple", "isKey": false, "notes": "Type of entity the attachment belongs to (e.g., 'lesson', 'assignment', 'submission', 'project', 'task', 'message')" },
+        { "id": "cid_target_id", "name": "target_id", "kind": "simple", "isKey": false, "notes": "ID of the entity the attachment belongs to" },
+        { "id": "cid_lesson_id_fk_att", "name": "lesson_id_fk_att", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for attachments on lessons" },
+        { "id": "cid_assignment_id_fk_att", "name": "assignment_id_fk_att", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for attachments on assignments" },
+        { "id": "cid_submission_id_fk_att", "name": "submission_id_fk_att", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for attachments on submissions" },
+        { "id": "cid_project_id_fk_att", "name": "project_id_fk_att", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for attachments on projects" },
+        { "id": "cid_task_id_fk_att", "name": "task_id_fk_att", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for attachments on tasks" },
+        { "id": "cid_message_id_fk_att", "name": "message_id_fk_att", "kind": "simple", "isKey": false, "semantics": ["foreign_key"], "notes": "Optional FK for attachments on messages" }
+      ]
+    },
+    {
+      "id": "cid_message",
+      "name": "Message",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_message_id", "name": "message_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_sender_id", "name": "sender_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_receiver_id", "name": "receiver_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_content", "name": "content", "kind": "simple", "isKey": false },
+        { "id": "cid_is_read", "name": "is_read", "kind": "simple", "isKey": false },
+        { "id": "cid_sent_at", "name": "sent_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_subject", "name": "subject", "kind": "simple", "isKey": false },
+        { "id": "cid_parent_message_id", "name": "parent_message_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_read_at", "name": "read_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_notification",
+      "name": "Notification",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_notification_id", "name": "notification_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_user_id", "name": "user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_type", "name": "type", "kind": "simple", "isKey": false },
+        { "id": "cid_content", "name": "content", "kind": "simple", "isKey": false },
+        { "id": "cid_is_read", "name": "is_read", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_link_url", "name": "link_url", "kind": "simple", "isKey": false, "semantics": ["url"] },
+        { "id": "cid_read_at", "name": "read_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_priority", "name": "priority", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_audit_log",
+      "name": "Audit_Log",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_log_id", "name": "log_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_user_id", "name": "user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_action", "name": "action", "kind": "simple", "isKey": false },
+        { "id": "cid_entity_type", "name": "entity_type", "kind": "simple", "isKey": false },
+        { "id": "cid_entity_id", "name": "entity_id", "kind": "simple", "isKey": false },
+        { "id": "cid_old_value", "name": "old_value", "kind": "simple", "isKey": false, "notes": "JSON string of old state" },
+        { "id": "cid_new_value", "name": "new_value", "kind": "simple", "isKey": false, "notes": "JSON string of new state" },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_ip_address", "name": "ip_address", "kind": "simple", "isKey": false },
+        { "id": "cid_user_agent", "name": "user_agent", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_tag",
+      "name": "Tag",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_tag_id", "name": "tag_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_name", "name": "name", "kind": "simple", "isKey": false, "semantics": ["unique_identifier"] },
+        { "id": "cid_color", "name": "color", "kind": "simple", "isKey": false },
+        { "id": "cid_description", "name": "description", "kind": "simple", "isKey": false },
+        { "id": "cid_created_at", "name": "created_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_course_tag",
+      "name": "Course_Tag",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_course_tag_course_id", "name": "course_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_course_tag_tag_id", "name": "tag_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_assigned_at", "name": "assigned_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_project_tag",
+      "name": "Project_Tag",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_project_tag_project_id", "name": "project_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_project_tag_tag_id", "name": "tag_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_assigned_at", "name": "assigned_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] }
+      ]
+    },
+    {
+      "id": "cid_course_rating",
+      "name": "Course_Rating",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_rating_id", "name": "rating_id", "kind": "simple", "isKey": true, "semantics": ["primary_key"] },
+        { "id": "cid_course_id", "name": "course_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_user_id", "name": "user_id", "kind": "simple", "isKey": false, "semantics": ["foreign_key"] },
+        { "id": "cid_rating_value", "name": "rating_value", "kind": "simple", "isKey": false },
+        { "id": "cid_comment", "name": "comment", "kind": "simple", "isKey": false },
+        { "id": "cid_rated_at", "name": "rated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_updated_at", "name": "updated_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_is_anonymous", "name": "is_anonymous", "kind": "simple", "isKey": false }
+      ]
+    },
+    {
+      "id": "cid_user_organization",
+      "name": "User_Organization",
+      "kind": "strong",
+      "attributes": [
+        { "id": "cid_user_organization_user_id", "name": "user_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_user_organization_organization_id", "name": "organization_id", "kind": "simple", "isKey": true, "semantics": ["primary_key", "foreign_key"] },
+        { "id": "cid_role_in_organization", "name": "role_in_organization", "kind": "simple", "isKey": false },
+        { "id": "cid_joined_at", "name": "joined_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_left_at", "name": "left_at", "kind": "simple", "isKey": false, "semantics": ["timestamp"] },
+        { "id": "cid_is_active", "name": "is_active", "kind": "simple", "isKey": false }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "cid_user_is_a_type",
+      "name": "User_Is_A_Type",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "parent", "cardinality": "1", "optional": false },
+        { "entityId": "cid_student", "role": "child", "cardinality": "1", "optional": false }
+      ],
+      "notes": "Student is a type of User"
+    },
+    {
+      "id": "cid_user_is_a_instructor",
+      "name": "User_Is_A_Instructor",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "parent", "cardinality": "1", "optional": false },
+        { "entityId": "cid_instructor", "role": "child", "cardinality": "1", "optional": false }
+      ],
+      "notes": "Instructor is a type of User"
+    },
+    {
+      "id": "cid_user_is_a_administrator",
+      "name": "User_Is_A_Administrator",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "parent", "cardinality": "1", "optional": false },
+        { "entityId": "cid_administrator", "role": "child", "cardinality": "1", "optional": false }
+      ],
+      "notes": "Administrator is a type of User"
+    },
+    {
+      "id": "cid_user_is_a_employee",
+      "name": "User_Is_A_Employee",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "parent", "cardinality": "1", "optional": false },
+        { "entityId": "cid_employee", "role": "child", "cardinality": "1", "optional": false }
+      ],
+      "notes": "Employee is a type of User"
+    },
+    {
+      "id": "cid_organization_has_departments",
+      "name": "Organization_Has_Departments",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_organization", "role": "owns", "cardinality": "1", "optional": false },
+        { "entityId": "cid_department", "role": "belongs_to", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_department_managed_by_user",
+      "name": "Department_Managed_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_department", "role": "managed_by", "cardinality": "1", "optional": false },
+        { "entityId": "cid_user", "role": "manager", "cardinality": "1", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_user_has_roles",
+      "name": "User_Has_Roles",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "has", "cardinality": "N", "optional": false },
+        { "entityId": "cid_user_role", "role": "assigned_to", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_role_assigned_to_user",
+      "name": "Role_Assigned_To_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_role", "role": "assigned_to", "cardinality": "N", "optional": false },
+        { "entityId": "cid_user_role", "role": "assigned_role", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_role_has_permissions",
+      "name": "Role_Has_Permissions",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_role", "role": "has", "cardinality": "N", "optional": false },
+        { "entityId": "cid_role_permission", "role": "grants", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_permission_granted_to_role",
+      "name": "Permission_Granted_To_Role",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_permission", "role": "granted_to", "cardinality": "N", "optional": false },
+        { "entityId": "cid_role_permission", "role": "permission_granted", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_course_created_by_user",
+      "name": "Course_Created_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "creator", "cardinality": "1", "optional": false },
+        { "entityId": "cid_course", "role": "created", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_course_has_lessons",
+      "name": "Course_Has_Lessons",
+      "type": "identifying",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_course", "role": "contains", "cardinality": "1", "optional": false },
+        { "entityId": "cid_lesson", "role": "part_of", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_lesson_has_materials",
+      "name": "Lesson_Has_Materials",
+      "type": "identifying",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_lesson", "role": "contains", "cardinality": "1", "optional": false },
+        { "entityId": "cid_material", "role": "part_of", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_material_uploaded_by_user",
+      "name": "Material_Uploaded_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "uploader", "cardinality": "1", "optional": false },
+        { "entityId": "cid_material", "role": "uploaded", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_course_has_assignments",
+      "name": "Course_Has_Assignments",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_course", "role": "defines", "cardinality": "1", "optional": false },
+        { "entityId": "cid_assignment", "role": "for_course", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_assignment_has_submissions",
+      "name": "Assignment_Has_Submissions",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_assignment", "role": "receives", "cardinality": "1", "optional": false },
+        { "entityId": "cid_submission", "role": "for_assignment", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_submission_by_user",
+      "name": "Submission_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "submitter", "cardinality": "1", "optional": false },
+        { "entityId": "cid_submission", "role": "submitted_by", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_submission_graded_by_user",
+      "name": "Submission_Graded_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "grader", "cardinality": "1", "optional": true },
+        { "entityId": "cid_submission", "role": "graded", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_course_has_exams",
+      "name": "Course_Has_Exams",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_course", "role": "offers", "cardinality": "1", "optional": false },
+        { "entityId": "cid_exam", "role": "for_course", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_exam_has_questions",
+      "name": "Exam_Has_Questions",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_exam", "role": "contains", "cardinality": "1", "optional": false },
+        { "entityId": "cid_question", "role": "part_of", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_question_has_answers",
+      "name": "Question_Has_Answers",
+      "type": "identifying",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_question", "role": "defines", "cardinality": "1", "optional": false },
+        { "entityId": "cid_answer", "role": "for_question", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_user_enrolls_in_course",
+      "name": "User_Enrolls_In_Course",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "student", "cardinality": "N", "optional": false },
+        { "entityId": "cid_enrollment", "role": "enrolls", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_course_has_enrollments",
+      "name": "Course_Has_Enrollments",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_course", "role": "offered_in", "cardinality": "N", "optional": false },
+        { "entityId": "cid_enrollment", "role": "enrollment_for", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_user_earns_certificate",
+      "name": "User_Earns_Certificate",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "earner", "cardinality": "1", "optional": false },
+        { "entityId": "cid_certificate", "role": "earned_by", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_certificate_for_course",
+      "name": "Certificate_For_Course",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_course", "role": "awards", "cardinality": "1", "optional": false },
+        { "entityId": "cid_certificate", "role": "awarded_for", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_user_has_skills",
+      "name": "User_Has_Skills",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "possesses", "cardinality": "N", "optional": false },
+        { "entityId": "cid_user_skill", "role": "skill_of", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_skill_possessed_by_user",
+      "name": "Skill_Possessed_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_skill", "role": "possessed_by", "cardinality": "N", "optional": false },
+        { "entityId": "cid_user_skill", "role": "user_with_skill", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_organization_manages_projects",
+      "name": "Organization_Manages_Projects",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_organization", "role": "manages", "cardinality": "1", "optional": false },
+        { "entityId": "cid_project", "role": "managed_by", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_project_created_by_user",
+      "name": "Project_Created_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "creator", "cardinality": "1", "optional": false },
+        { "entityId": "cid_project", "role": "created", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_project_has_members",
+      "name": "Project_Has_Members",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_project", "role": "has", "cardinality": "N", "optional": false },
+        { "entityId": "cid_project_member", "role": "member_of", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_user_is_project_member",
+      "name": "User_Is_Project_Member",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "member", "cardinality": "N", "optional": false },
+        { "entityId": "cid_project_member", "role": "is_member", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_project_has_tasks",
+      "name": "Project_Has_Tasks",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_project", "role": "contains", "cardinality": "1", "optional": false },
+        { "entityId": "cid_task", "role": "part_of", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_task_assigned_to_user",
+      "name": "Task_Assigned_To_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "assignee", "cardinality": "1", "optional": true },
+        { "entityId": "cid_task", "role": "assigned", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_task_created_by_user",
+      "name": "Task_Created_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "creator", "cardinality": "1", "optional": false },
+        { "entityId": "cid_task", "role": "created", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_task_has_parent_task",
+      "name": "Task_Has_Parent_Task",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_task", "role": "child_task", "cardinality": "N", "optional": false },
+        { "entityId": "cid_task", "role": "parent_task", "cardinality": "1", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_comment_by_user",
+      "name": "Comment_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "author", "cardinality": "1", "optional": false },
+        { "entityId": "cid_comment", "role": "authored", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_comment_on_course",
+      "name": "Comment_On_Course",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_course", "role": "commented_on", "cardinality": "1", "optional": true },
+        { "entityId": "cid_comment", "role": "comment_for_course", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_comment_on_lesson",
+      "name": "Comment_On_Lesson",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_lesson", "role": "commented_on", "cardinality": "1", "optional": true },
+        { "entityId": "cid_comment", "role": "comment_for_lesson", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_comment_on_project",
+      "name": "Comment_On_Project",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_project", "role": "commented_on", "cardinality": "1", "optional": true },
+        { "entityId": "cid_comment", "role": "comment_for_project", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_comment_on_task",
+      "name": "Comment_On_Task",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_task", "role": "commented_on", "cardinality": "1", "optional": true },
+        { "entityId": "cid_comment", "role": "comment_for_task", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_comment_on_submission",
+      "name": "Comment_On_Submission",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_submission", "role": "commented_on", "cardinality": "1", "optional": true },
+        { "entityId": "cid_comment", "role": "comment_for_submission", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_comment_replies_to_comment",
+      "name": "Comment_Replies_To_Comment",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_comment", "role": "reply", "cardinality": "N", "optional": false },
+        { "entityId": "cid_comment", "role": "parent_comment", "cardinality": "1", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_attachment_uploaded_by_user",
+      "name": "Attachment_Uploaded_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "uploader", "cardinality": "1", "optional": false },
+        { "entityId": "cid_attachment", "role": "uploaded", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_attachment_on_lesson",
+      "name": "Attachment_On_Lesson",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_lesson", "role": "attached_to", "cardinality": "1", "optional": true },
+        { "entityId": "cid_attachment", "role": "attachment_for_lesson", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_attachment_on_assignment",
+      "name": "Attachment_On_Assignment",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_assignment", "role": "attached_to", "cardinality": "1", "optional": true },
+        { "entityId": "cid_attachment", "role": "attachment_for_assignment", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_attachment_on_submission",
+      "name": "Attachment_On_Submission",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_submission", "role": "attached_to", "cardinality": "1", "optional": true },
+        { "entityId": "cid_attachment", "role": "attachment_for_submission", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_attachment_on_project",
+      "name": "Attachment_On_Project",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_project", "role": "attached_to", "cardinality": "1", "optional": true },
+        { "entityId": "cid_attachment", "role": "attachment_for_project", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_attachment_on_task",
+      "name": "Attachment_On_Task",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_task", "role": "attached_to", "cardinality": "1", "optional": true },
+        { "entityId": "cid_attachment", "role": "attachment_for_task", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_attachment_on_message",
+      "name": "Attachment_On_Message",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_message", "role": "attached_to", "cardinality": "1", "optional": true },
+        { "entityId": "cid_attachment", "role": "attachment_for_message", "cardinality": "N", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_message_sent_by_user",
+      "name": "Message_Sent_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "sender", "cardinality": "1", "optional": false },
+        { "entityId": "cid_message", "role": "sent_by", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_message_received_by_user",
+      "name": "Message_Received_By_User",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "receiver", "cardinality": "1", "optional": false },
+        { "entityId": "cid_message", "role": "received_by", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_message_replies_to_message",
+      "name": "Message_Replies_To_Message",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_message", "role": "reply", "cardinality": "N", "optional": false },
+        { "entityId": "cid_message", "role": "parent_message", "cardinality": "1", "optional": true }
+      ]
+    },
+    {
+      "id": "cid_user_receives_notifications",
+      "name": "User_Receives_Notifications",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "recipient", "cardinality": "1", "optional": false },
+        { "entityId": "cid_notification", "role": "for_user", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_user_generates_audit_logs",
+      "name": "User_Generates_Audit_Logs",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "actor", "cardinality": "1", "optional": true },
+        { "entityId": "cid_audit_log", "role": "generated_by", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_course_has_tags",
+      "name": "Course_Has_Tags",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_course", "role": "tagged", "cardinality": "N", "optional": false },
+        { "entityId": "cid_course_tag", "role": "tagging", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_tag_applied_to_course",
+      "name": "Tag_Applied_To_Course",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_tag", "role": "applied_to", "cardinality": "N", "optional": false },
+        { "entityId": "cid_course_tag", "role": "tag_application", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_project_has_tags",
+      "name": "Project_Has_Tags",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_project", "role": "tagged", "cardinality": "N", "optional": false },
+        { "entityId": "cid_project_tag", "role": "tagging", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_tag_applied_to_project",
+      "name": "Tag_Applied_To_Project",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_tag", "role": "applied_to", "cardinality": "N", "optional": false },
+        { "entityId": "cid_project_tag", "role": "tag_application", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_user_rates_course",
+      "name": "User_Rates_Course",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "rater", "cardinality": "N", "optional": false },
+        { "entityId": "cid_course_rating", "role": "rating_by", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_course_receives_ratings",
+      "name": "Course_Receives_Ratings",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_course", "role": "rated", "cardinality": "N", "optional": false },
+        { "entityId": "cid_course_rating", "role": "rating_for", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_user_belongs_to_organization",
+      "name": "User_Belongs_To_Organization",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_user", "role": "member", "cardinality": "N", "optional": false },
+        { "entityId": "cid_user_organization", "role": "membership", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_organization_has_users",
+      "name": "Organization_Has_Users",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_organization", "role": "contains", "cardinality": "N", "optional": false },
+        { "entityId": "cid_user_organization", "role": "user_membership", "cardinality": "N", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_employee_works_in_department",
+      "name": "Employee_Works_In_Department",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_employee", "role": "employee", "cardinality": "N", "optional": false },
+        { "entityId": "cid_department", "role": "department", "cardinality": "1", "optional": false }
+      ]
+    },
+    {
+      "id": "cid_employee_reports_to_manager",
+      "name": "Employee_Reports_To_Manager",
+      "type": "association",
+      "arity": 2,
+      "ends": [
+        { "entityId": "cid_employee", "role": "subordinate", "cardinality": "N", "optional": false },
+        { "entityId": "cid_user", "role": "manager", "cardinality": "1", "optional": true }
+      ]
+    }
+  ],
+  "generalizations": [
+    {
+      "id": "cid_user_generalization",
+      "parentEntityId": "cid_user",
+      "childEntityIds": ["cid_student", "cid_instructor", "cid_administrator", "cid_employee"],
+      "categoryBy": "User Type",
+      "constraints": {
+        "disjointness": "disjoint",
+        "completeness": "total"
+      }
+    }
+  ],
+  "categories": [],
+  "constraints": [],
+  "notes": "This conceptual model represents a comprehensive platform for education and enterprise management. It includes core entities like Users, Organizations, Courses, and Projects, with detailed attributes and complex relationships. Generalization is used for User types (Student, Instructor, Administrator, Employee). Weak entities are identified for Lesson, Material, and Answer. Polymorphic associations for Comments and Attachments are modeled with multiple optional foreign keys to represent the 'target' entity. Many-to-many relationships are resolved using junction entities. Self-referencing relationships are included for Tasks (parent-child) and Messages (threads).",
+  "tags": ["education", "enterprise", "management", "e-learning", "project-management", "hr"]
+}

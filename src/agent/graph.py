@@ -34,7 +34,7 @@ load_dotenv()
 async def chatbot_node(state: AgentState) -> Dict[str, Any]:
     """General-purpose chatbot — answers questions about the current schema."""
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite",
+        model=os.getenv("API_MODEL"),
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0.7,
     )

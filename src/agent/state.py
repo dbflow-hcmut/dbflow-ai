@@ -16,9 +16,8 @@ class AgentState(TypedDict):
 
     Attributes:
         messages: Conversation history (auto-merged via ``add_messages``).
-        schema_model: Current DB schema (tables, fields, relationships).
-        ui_diagram: Diagram layout synchronised with *schema_model*.
-        history: Previous snapshots of ``(schema_model, ui_diagram)`` for revert.
+        schema_model: Current DB schema (model.json).
+        history: Previous snapshots of ``schema_model`` for revert.
         current_level: Active abstraction level (Conceptual / Logical / Physical).
         user_intent: Classified intent from the latest user message.
         retrieval_context: Retrieved schema spec documentation from RAG (injected into LLM prompts).
@@ -26,7 +25,6 @@ class AgentState(TypedDict):
 
     messages: Annotated[Sequence[AnyMessage], add_messages]
     schema_model: Optional[Dict[str, Any]]
-    ui_diagram: Optional[Dict[str, Any]]
     history: List[Dict[str, Any]]
     current_level: str  # default "conceptual" — set in graph entry
     user_intent: Optional[str]

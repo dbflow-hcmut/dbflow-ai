@@ -86,26 +86,38 @@ def _generic_checks(data: dict, level: str) -> List[str]:
 
 def _check_conceptual(data: dict, issues: List[str]) -> None:
     entities = data.get("entities", [])
+    if not isinstance(entities, list):
+        entities = []
     relationships = data.get("relationships", [])
+    if not isinstance(relationships, list):
+        relationships = []
 
     # Duplicate entity names
-    names = [e.get("name", "") for e in entities]
+    names = [e.get("name", "") for e in entities if isinstance(e, dict)]
     for name in set(n for n in names if names.count(n) > 1):
         issues.append(f"⚠️ Duplicate entity name: `{name}`.")
 
     # Every entity should have at least one key attribute
     for ent in entities:
+        if not isinstance(ent, dict):
+            continue
         attrs = ent.get("attributes", [])
-        has_key = any(a.get("isKey") for a in attrs)
+        if not isinstance(attrs, list):
+            attrs = []
+        has_key = any(a.get("isKey") for a in attrs if isinstance(a, dict))
         if not has_key and ent.get("kind", "strong") == "strong":
             issues.append(
                 f"⚠️ Entity `{ent.get('name')}` (strong) has no key attribute."
             )
 
     # Relationship ends reference valid entity IDs
-    entity_ids = {e.get("id") for e in entities}
+    entity_ids = {e.get("id") for e in entities if isinstance(e, dict)}
     for rel in relationships:
+        if not isinstance(rel, dict):
+            continue
         for end in rel.get("ends", []):
+            if not isinstance(end, dict):
+                continue
             eid = end.get("entityId")
             if eid and eid not in entity_ids:
                 issues.append(
@@ -116,34 +128,47 @@ def _check_conceptual(data: dict, issues: List[str]) -> None:
 
 def _check_logical(data: dict, issues: List[str]) -> None:
     tables = data.get("tables", [])
+    if not isinstance(tables, list):
+        tables = []
 
     # Duplicate table names
-    names = [t.get("name", "") for t in tables]
+    names = [t.get("name", "") for t in tables if isinstance(t, dict)]
     for name in set(n for n in names if names.count(n) > 1):
         issues.append(f"⚠️ Duplicate table name: `{name}`.")
 
-    table_ids = {t.get("id") for t in tables}
+    table_ids = {t.get("id") for t in tables if isinstance(t, dict)}
     col_index: Dict[str, set] = {}
     for t in tables:
+        if not isinstance(t, dict):
+            continue
+        cols = t.get("columns", [])
+        if not isinstance(cols, list):
+            cols = []
         col_index[t.get("id", "")] = {
-            c.get("id") for c in t.get("columns", [])
+            c.get("id") for c in cols if isinstance(c, dict)
         }
 
     for table in tables:
+        if not isinstance(table, dict):
+            continue
         columns = table.get("columns", [])
+        if not isinstance(columns, list):
+            columns = []
         tname = table.get("name", "?")
 
         # Every table should have at least one PK column
         has_pk = any(
-            c.get("roles", {}).get("primaryKey") for c in columns
+            c.get("roles", {}).get("primaryKey") for c in columns if isinstance(c, dict)
         )
         if not has_pk:
             issues.append(f"⚠️ Table `{tname}` has no primary key column.")
 
         # FK references must point to valid tables/columns
         for col in columns:
+            if not isinstance(col, dict):
+                continue
             fk = col.get("roles", {}).get("foreignKey")
-            if fk:
+            if fk and isinstance(fk, dict):
                 ref_tid = fk.get("refTableId")
                 ref_cid = fk.get("refColumnId")
                 if ref_tid and ref_tid not in table_ids:
@@ -160,10 +185,18 @@ def _check_logical(data: dict, issues: List[str]) -> None:
 
 def _check_physical(data: dict, issues: List[str]) -> None:
     databases = data.get("databases", [])
+    if not isinstance(databases, list):
+        databases = []
     for db in databases:
+        if not isinstance(db, dict):
+            continue
         for schema in db.get("schemas", []):
+            if not isinstance(schema, dict):
+                continue
             tables = schema.get("tables", [])
-            names = [t.get("name", "") for t in tables]
+            if not isinstance(tables, list):
+                tables = []
+            names = [t.get("name", "") for t in tables if isinstance(t, dict)]
             for name in set(n for n in names if names.count(n) > 1):
                 issues.append(
                     f"⚠️ Duplicate table name in schema "
@@ -193,15 +226,7 @@ def _run_validation(
             _validate_with_json_schema(raw_model, model_schema, "model.json")
         )
 
-    # 2) JSON Schema validation — diagram
-    if raw_diagram:
-        diagram_schema = _load_json_schema(level, "diagram")
-        if diagram_schema:
-            all_issues.extend(
-                _validate_with_json_schema(
-                    raw_diagram, diagram_schema, "diagram.json"
-                )
-            )
+    # 2) Diagram validation is skipped — diagram is built by the front-end.
 
     # 3) Generic structural checks
     all_issues.extend(_generic_checks(raw_model, level))
@@ -216,7 +241,6 @@ async def validator_node(state: AgentState) -> Dict[str, Any]:
     structural checks.  All blocking work is offloaded to a thread.
     """
     raw_model = state.get("schema_model")
-    raw_diagram = state.get("ui_diagram")
     level = state.get("current_level", "conceptual")
 
     if not raw_model:
@@ -226,7 +250,7 @@ async def validator_node(state: AgentState) -> Dict[str, Any]:
 
     # Run all blocking validation in a separate thread
     all_issues = await asyncio.to_thread(
-        _run_validation, raw_model, raw_diagram, level
+        _run_validation, raw_model, None, level
     )
 
     # Build response message

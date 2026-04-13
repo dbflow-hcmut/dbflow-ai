@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2019-09/schema",
   "$id": "https://example.com/conceptual/diagram.schema.json",
   "title": "Conceptual ER/EER Diagram",
+  "description": "Matches StoredDiagramNode / StoredDiagramEdge in conceptual-diagram.builder.ts",
   "type": "object",
   "additionalProperties": false,
   "required": ["diagram"],
@@ -35,7 +36,10 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["x", "y"],
-      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
     },
 
     "size": {
@@ -49,6 +53,7 @@
     },
 
     "node": {
+      "description": "SchemaStoredDiagramNode — a visual node on the canvas.",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "type", "position", "size"],
@@ -57,14 +62,7 @@
 
         "type": {
           "type": "string",
-          "enum": [
-            "entity",
-            "relationship",
-            "attribute",
-            "isaCircle",
-            "unionCircle",
-            "note"
-          ]
+          "enum": ["entity", "relationship", "attribute", "isaCircle", "unionCircle", "note"]
         },
 
         "position": { "$ref": "#/$defs/point" },
@@ -73,12 +71,46 @@
         "zIndex": { "type": "integer", "minimum": 0 },
 
         "style": {
+          "description": "Visual styling. May include a 'meta' object for entity/relationship/attribute rendering hints.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
             "class": { "type": "string" },
             "stroke": { "type": ["string", "null"] },
-            "fill": { "type": ["string", "null"] }
+            "fill": { "type": ["string", "null"] },
+            "meta": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "entity": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "variant": { "type": "string", "enum": ["single", "double", "dashed"] },
+                    "fields": { "type": "array" }
+                  }
+                },
+                "relationship": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "variant": { "type": "string", "enum": ["single", "double", "dashed"] },
+                    "cardinalities": {
+                      "type": "object",
+                      "additionalProperties": { "type": "string" }
+                    }
+                  }
+                },
+                "attribute": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "variant": { "type": "string", "enum": ["single", "double", "dashed"] },
+                    "isKey": { "type": "boolean" }
+                  }
+                }
+              }
+            }
           }
         },
 
@@ -115,58 +147,59 @@
               "enum": ["solid", "dashed"],
               "default": "solid"
             }
-          },
-
-          "isaCircle": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "symbol": { "type": "string", "enum": ["d", "o"], "default": "d" }
-            }
-          },
-
-          "unionCircle": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "symbol": { "type": "string", "enum": ["U"], "default": "U" },
-              "categoryId": { "type": "string", "pattern": "^cid_" }
-            }
-          },
-
-          "text": { "type": "string" }
+          }
         },
 
-        "allOf": [
-          {
-            "if": { "properties": { "type": { "const": "entity" } } },
-            "then": { "required": ["entityId"] }
-          },
-          {
-            "if": { "properties": { "type": { "const": "relationship" } } },
-            "then": { "required": ["relationshipId"] }
-          },
-          {
-            "if": { "properties": { "type": { "const": "attribute" } } },
-            "then": { "required": ["attributeId"] }
-          },
-          {
-            "if": { "properties": { "type": { "const": "isaCircle" } } },
-            "then": { "required": ["isaCircle"] }
-          },
-          {
-            "if": { "properties": { "type": { "const": "unionCircle" } } },
-            "then": { "required": ["unionCircle"] }
-          },
-          {
-            "if": { "properties": { "type": { "const": "note" } } },
-            "then": { "required": ["text"] }
+        "isaCircle": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "symbol": { "type": "string", "enum": ["d", "o"], "default": "d" }
           }
-        ]
-      }
+        },
+
+        "unionCircle": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "symbol": { "type": "string", "enum": ["U"], "default": "U" },
+            "categoryId": { "type": "string", "pattern": "^cid_" }
+          }
+        },
+
+        "text": { "type": "string" }
+      },
+
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "entity" } } },
+          "then": { "required": ["entityId"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "relationship" } } },
+          "then": { "required": ["relationshipId"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "attribute" } } },
+          "then": { "required": ["attributeId"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "isaCircle" } } },
+          "then": { "required": ["isaCircle"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "unionCircle" } } },
+          "then": { "required": ["unionCircle"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "note" } } },
+          "then": { "required": ["text"] }
+        }
+      ]
     },
 
     "edge": {
+      "description": "StoredDiagramEdge — a connection between two nodes.",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "type", "from", "to"],
@@ -179,6 +212,7 @@
             "participation",
             "attrOf",
             "componentOf",
+            "identifying",
             "isaParent",
             "isaChild",
             "categoryLink",
@@ -194,18 +228,24 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["nodeId"],
-          "properties": { "nodeId": { "type": "string", "pattern": "^cid_" } }
+          "properties": {
+            "nodeId": { "type": "string", "pattern": "^cid_" },
+            "portId": { "type": "string", "enum": ["top", "bottom", "left", "right"] }
+          }
         },
         "to": {
           "type": "object",
           "additionalProperties": false,
           "required": ["nodeId"],
-          "properties": { "nodeId": { "type": "string", "pattern": "^cid_" } }
+          "properties": {
+            "nodeId": { "type": "string", "pattern": "^cid_" },
+            "portId": { "type": "string", "enum": ["top", "bottom", "left", "right"] }
+          }
         },
 
         "labels": {
           "type": "object",
-          "additionalProperties": true,
+          "additionalProperties": false,
           "properties": {
             "nearFrom": { "type": "string" },
             "center": { "type": "string" },
@@ -222,11 +262,8 @@
               "additionalProperties": false,
               "properties": {
                 "doubleLine": { "type": "boolean" },
-                "marker": {
-                  "type": "string",
-                  "enum": ["none", "one", "many"],
-                  "default": "none"
-                }
+                "marker": { "type": "string", "enum": ["none", "one", "many"], "default": "none" },
+                "bracket": { "type": "boolean" }
               }
             },
             "to": {
@@ -234,11 +271,8 @@
               "additionalProperties": false,
               "properties": {
                 "doubleLine": { "type": "boolean" },
-                "marker": {
-                  "type": "string",
-                  "enum": ["none", "one", "many"],
-                  "default": "none"
-                }
+                "marker": { "type": "string", "enum": ["none", "one", "many"], "default": "none" },
+                "bracket": { "type": "boolean" }
               }
             }
           }
@@ -248,6 +282,10 @@
       "allOf": [
         {
           "if": { "properties": { "type": { "const": "participation" } } },
+          "then": { "required": ["relationshipId"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "identifying" } } },
           "then": { "required": ["relationshipId"] }
         },
         {

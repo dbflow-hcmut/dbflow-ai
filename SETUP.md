@@ -6,10 +6,12 @@
 cd dbflow-ai
 
 # Tạo venv (chỉ cần chạy 1 lần)
-python3 -m venv .venv
+python3.11 -m venv .venv
 
 # Kích hoạt
 source .venv/bin/activate
+
+deactivate
 ```
 
 > Terminal hiển thị `(.venv)` ở đầu dòng là thành công.

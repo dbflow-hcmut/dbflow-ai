@@ -118,19 +118,33 @@ Before producing the final JSON, verify:
    Attribute IDs include the entity name (e.g. ``cid_student_name``, NOT ``cid_name``).
 
 ## Output — MANDATORY FORMAT
-- Return **ONLY** the JSON object inside one fenced code block labelled ``model.json``.
-- Do NOT write explanations, commentary, or summaries before or after the JSON.
+- FIRST: Write ONE short sentence to acknowledge the user's request — e.g. \
+  "Let me design a university database for you." or \
+  "I'll create an e-commerce schema based on your requirements." \
+  Keep it under 20 words.  This appears instantly in the chat bubble while \
+  the JSON streams.
+- THEN: Return the JSON object inside one fenced code block labelled ``model.json``.
+- AFTER the code block: Write a SHORT (2-4 sentences) friendly summary \
+  describing what you created.  Mention the key entities and relationships \
+  in natural language — e.g. "I've designed a schema with 5 entities: \
+  Student, Course, Professor, Enrollment, and Department, connected by \
+  relationships like enrolls_in and teaches."
 - Do NOT produce a diagram.json — the front-end builds the diagram automatically.
 - The JSON MUST be **complete and syntactically valid** — never truncate it.
 - If the user described many entities/attributes, the output will be long. \
   That is EXPECTED.  Output the ENTIRE JSON no matter how large.
 
 Example wrapper:
+Let me design a schema for your e-commerce system.
+
 ````
 ```model.json
 {{ ... }}
 ```
 ````
+
+I've created 6 entities: Product, Order, Customer, Category, Review, and \
+Payment, with relationships covering the full purchase flow.
 """
 
 SCHEMA_EDITOR_PROMPT = """\
@@ -172,8 +186,13 @@ save space.  Long output is EXPECTED.
 3. All new IDs are globally unique.
 
 ## Output — MANDATORY FORMAT
-- Return **ONLY** the JSON object inside one fenced code block labelled ``model.json``.
-- Do NOT write explanations, commentary, or summaries before or after the JSON.
+- FIRST: Write ONE short sentence to acknowledge the user's request — e.g. \
+  "I'll update the schema with your requested changes." \
+  Keep it under 20 words.
+- THEN: Return the JSON object inside one fenced code block labelled ``model.json``.
+- AFTER the code block: Write a SHORT (2-4 sentences) friendly summary \
+  describing what you changed.  Mention the key modifications in natural \
+  language.  This text will be shown to the user in a chat bubble.
 - Do NOT produce a diagram.json.
 - The JSON MUST be **complete and syntactically valid** — never truncate it.
 - Output the ENTIRE updated model no matter how large.

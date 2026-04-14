@@ -203,6 +203,22 @@ def _make_llm() -> ChatGoogleGenerativeAI:
     )
 
 
+def _extract_text_before_json(text: str) -> str:
+    """Extract the human-readable text that appears before the first JSON code block.
+    
+    Returns the text summary (what the AI wants to say to the user) stripped of
+    the JSON code block.
+    """
+    # Find the first code block
+    pattern = r"```(?:\w+)?\s*(?:model\.json)?\s*\n[\s\S]*?```"
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        before = text[:match.start()].strip()
+        return before if before else ""
+    # No code block found — return empty (will fall back to summary)
+    return ""
+
+
 def _extract_model_json(text: str) -> Optional[Dict[str, Any]]:
     """Extract model.json from fenced code blocks in LLM output.
 
@@ -304,10 +320,18 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
         entity_names = [e.get("name", "?") for e in entities]
         rels = model_data.get("relationships", [])
 
+        # Extract the human-readable description from the LLM response
+        ai_description = _extract_text_before_json(response_text)
+        if not ai_description:
+            ai_description = (
+                f"I've designed a {level} schema with {len(entity_names)} "
+                f"entities ({', '.join(entity_names[:5])}"
+                f"{'...' if len(entity_names) > 5 else ''}) "
+                f"and {len(rels)} relationships."
+            )
+
         summary = (
-            f"✅ **Schema created successfully!** (Level: {level})\n\n"
-            f"**Entities/Tables ({len(entity_names)}):** {', '.join(entity_names)}\n"
-            f"**Relationships:** {len(rels)}\n\n"
+            f"{ai_description}\n\n"
             f"<details><summary>📋 model.json</summary>\n\n"
             f"```json\n{json.dumps(model_data, indent=2, ensure_ascii=False)}\n```\n\n"
             f"</details>"
@@ -399,10 +423,16 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
         entities = model_data.get("entities", []) or model_data.get("tables", [])
         entity_names = [e.get("name", "?") for e in entities]
 
+        # Extract the human-readable description from the LLM response
+        ai_description = _extract_text_before_json(response_text)
+        if not ai_description:
+            ai_description = (
+                f"I've updated the {level} schema. It now has {len(entity_names)} "
+                f"entities and {len(model_data.get('relationships', []))} relationships."
+            )
+
         summary = (
-            f"✏️ **Schema updated successfully!** (Level: {level})\n\n"
-            f"**Entities/Tables ({len(entity_names)}):** {', '.join(entity_names)}\n"
-            f"**Relationships:** {len(model_data.get('relationships', []))}\n\n"
+            f"{ai_description}\n\n"
             f"<details><summary>📋 model.json</summary>\n\n"
             f"```json\n{json.dumps(model_data, indent=2, ensure_ascii=False)}\n```\n\n"
             f"</details>"

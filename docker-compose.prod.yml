@@ -45,6 +45,8 @@ services:
       - "2024:8000" # LangGraph Server mặc định chạy port 8000 trong container
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - API_MODEL=${API_MODEL:-gemini-3.1-flash-lite-preview}
+      - SCHEMA_MAX_OUTPUT_TOKENS=${SCHEMA_MAX_OUTPUT_TOKENS:-131072}
       - LANGSMITH_TRACING=${LANGSMITH_TRACING:-true}
       - LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY:-}

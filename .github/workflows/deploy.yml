@@ -118,7 +118,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          envs: GOOGLE_API_KEY,LANGSMITH_TRACING,LANGSMITH_ENDPOINT,LANGSMITH_API_KEY,LANGSMITH_PROJECT,REGISTRY,IMAGE_NAME,GHCR_TOKEN,GHCR_USER
+          envs: GOOGLE_API_KEY,API_MODEL,SCHEMA_MAX_OUTPUT_TOKENS,LANGSMITH_TRACING,LANGSMITH_ENDPOINT,LANGSMITH_API_KEY,LANGSMITH_PROJECT,REGISTRY,IMAGE_NAME,GHCR_TOKEN,GHCR_USER
           script: |
             cd ~/dbflow-ai
 
@@ -132,6 +132,8 @@ jobs:
             cat > .env << EOF
             IMAGE_NAME=${IMAGE_NAME}
             GOOGLE_API_KEY=${GOOGLE_API_KEY}
+            API_MODEL=${API_MODEL}
+            SCHEMA_MAX_OUTPUT_TOKENS=${SCHEMA_MAX_OUTPUT_TOKENS}
             LANGSMITH_TRACING=${LANGSMITH_TRACING}
             LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT}
             LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
@@ -147,6 +149,8 @@ jobs:
             echo "✅ Deploy completed successfully!"
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          API_MODEL: ${{ secrets.API_MODEL }}
+          SCHEMA_MAX_OUTPUT_TOKENS: ${{ secrets.SCHEMA_MAX_OUTPUT_TOKENS }}
           LANGSMITH_TRACING: ${{ secrets.LANGSMITH_TRACING }}
           LANGSMITH_ENDPOINT: ${{ secrets.LANGSMITH_ENDPOINT }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}

@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from agent.prompts import SCHEMA_EDITOR_PROMPT, SCHEMA_GENERATOR_PROMPT
+from agent.prompts import SCHEMA_EDITOR_PROMPT, SCHEMA_GENERATOR_PROMPT, LEVEL_INSTRUCTIONS
 from agent.state import AgentState
 
 load_dotenv()
@@ -262,7 +262,13 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
     llm = _make_llm()
 
     retrieval_context = state.get("retrieval_context") or "(No schema specification available)"
-    prompt = SCHEMA_GENERATOR_PROMPT.format(retrieval_context=retrieval_context)
+    level = state.get("current_level", "conceptual")
+    level_instructions = LEVEL_INSTRUCTIONS.get(level, "")
+    prompt = SCHEMA_GENERATOR_PROMPT.format(
+        retrieval_context=retrieval_context,
+        current_level=level,
+        level_specific_instructions=level_instructions,
+    )
 
     messages = [
         SystemMessage(content=prompt),
@@ -357,7 +363,13 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
     llm = _make_llm()
 
     retrieval_context = state.get("retrieval_context") or "(No schema specification available)"
-    prompt = SCHEMA_EDITOR_PROMPT.format(retrieval_context=retrieval_context)
+    level = state.get("current_level", "conceptual")
+    level_instructions = LEVEL_INSTRUCTIONS.get(level, "")
+    prompt = SCHEMA_EDITOR_PROMPT.format(
+        retrieval_context=retrieval_context,
+        current_level=level,
+        level_specific_instructions=level_instructions,
+    )
 
     current_model_json = json.dumps(
         state.get("schema_model", {}), indent=2, ensure_ascii=False

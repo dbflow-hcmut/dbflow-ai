@@ -53,7 +53,9 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
 
     updates: Dict[str, Any] = {"user_intent": result.intent.value}
 
-    # Update current_level if the user explicitly mentioned a level
+    # Only update current_level if the LLM explicitly detected a level from the
+    # user's message.  When `detected_level` is null the frontend-supplied level
+    # (or the existing state value) is preserved.
     if result.detected_level and result.detected_level in (
         "conceptual", "logical", "physical"
     ):

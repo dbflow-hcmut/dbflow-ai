@@ -172,27 +172,43 @@ LEVEL_INSTRUCTIONS = {
     "physical": """\
 ### Physical-level design rules
 - This is a **physical relational schema** — you produce **tables** with **columns** that include \
-  concrete data types, constraints, and indexes — ready for DDL generation.
-- The JSON format is the SAME as logical: ``{{ "model": {{ ... }}, "tables": [ ... ] }}``
+  concrete data types, constraints, indexes, and FK actions — ready for DDL generation.
+- The JSON format: ``{{ "model": {{ ... }}, "tables": [ ... ] }}``
 - Every table MUST have at least one column with ``roles.primaryKey: true``.
-- Use ``dataType`` on every column (e.g. ``"integer"``, ``"varchar(255)"``, ``"timestamp"``, \
-  ``"boolean"``, ``"decimal(10,2)"``, ``"text"``, ``"uuid"``).
+- **Composite primary keys** are supported: multiple columns can have ``roles.primaryKey: true``.
+- **dataType and length are SEPARATE fields**:
+  - ``dataType``: base type only (e.g. ``"varchar"``, ``"integer"``, ``"decimal"``)
+  - ``length``: optional separate field (e.g. ``"255"`` for varchar(255), ``"10,2"`` for decimal(10,2))
+  - DO NOT put length inside dataType (❌ ``"varchar(255)"`` → ✅ ``"varchar"`` + ``"length": "255"``)
+- **autoIncrement**: set ``autoIncrement: true`` for serial/identity PK columns.
+- **defaultValue**: SQL default expression string (e.g. ``"NOW()"``, ``"0"``, ``"'active'"``, ``"true"``).
+- **unique**: set ``unique: true`` for columns with UNIQUE constraint (PK and unique business keys).
 - Use **foreign keys** exactly like logical:
   - For 1:N: add an FK column in the "many" side table referencing the "one" side PK.
   - For M:N: create a **junction table** with composite PK.
   - For 1:1: add an FK in one side with ``unique: true``.
   - FK columns MUST have ``roles.foreignKey`` with valid ``refTableId`` and ``refColumnId``.
+  - FK MUST include ``onDelete`` and ``onUpdate`` actions:
+    - ``CASCADE``: for dependent child records (e.g. order_items when order is deleted).
+    - ``SET NULL``: for optional references (e.g. assigned_to when user is deleted).
+    - ``RESTRICT``: to prevent deletion of referenced records.
+    - ``NO ACTION``: default, same as RESTRICT in most DBMS.
+- **Indexes**: add ``indexes`` array on tables for frequently queried columns:
+  - Each index has: ``id``, ``name``, ``type`` (BTREE/HASH/GIN/GIST/BRIN), ``columns`` (with ``columnName`` and ``order`` ASC/DESC), ``isUnique``.
+  - FK columns SHOULD have a BTREE index.
+  - Unique business keys SHOULD have a unique index.
+  - Columns used in WHERE/JOIN/ORDER BY SHOULD be indexed.
 - Set ``nullable: false`` for PK and mandatory FK columns. Set ``unique: true`` for PK and unique columns.
 - Include domain-relevant columns with appropriate data types:
-  - **Identifiers**: ``integer`` or ``uuid`` primary keys
-  - **Text**: ``varchar(N)`` for bounded, ``text`` for unbounded
-  - **Numbers**: ``integer``, ``bigint``, ``decimal(p,s)``, ``float``
+  - **Identifiers**: ``integer`` or ``uuid`` primary keys with ``autoIncrement: true``
+  - **Text**: ``varchar`` with ``length`` for bounded, ``text`` for unbounded
+  - **Numbers**: ``integer``, ``bigint``, ``decimal`` (with ``length`` e.g. ``"10,2"``), ``float``
   - **Dates**: ``date``, ``timestamp``, ``timestamptz``
   - **Booleans**: ``boolean``
-  - **Timestamps**: ``created_at timestamptz``, ``updated_at timestamptz``
+  - **Timestamps**: ``created_at`` / ``updated_at`` with type ``timestamptz`` and ``defaultValue: "NOW()"``
 - Use snake_case for table and column names.
-- Table IDs should use ``pid_`` prefix (e.g. ``pid_customer``, ``pid_order``).
-- Column IDs should use ``pid_<tableId>_col_<index>`` pattern.
+- Table IDs use ``pid_`` prefix (e.g. ``pid_customer``, ``pid_order``).
+- Column IDs use ``pid_<table>_<column>`` pattern (e.g. ``pid_customer_email``).
 - DO NOT include ``entities``, ``relationships``, ``generalizations``, or ``categories`` — those are conceptual-level only.
 """,
 }

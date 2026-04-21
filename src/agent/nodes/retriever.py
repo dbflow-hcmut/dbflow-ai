@@ -69,11 +69,21 @@ def _pick_filters(state: AgentState) -> dict:
 async def retriever_node(state: AgentState) -> Dict[str, Any]:
     """Retrieve schema specification docs — hybrid strategy.
 
-    1. Try reading the full spec files for the current level.
+    For forward/reverse engineering, fetches specs for the **target level**
+    (where the output will land), not the source level.
+    For create/edit, fetches specs for the current level.
+
+    1. Try reading the full spec files for the level.
        If total size < 30 KB → use the full text (guarantees 100 % coverage).
     2. If files are too large or missing → fall back to ChromaDB RAG.
     """
-    level = state.get("current_level", "conceptual")
+    intent = state.get("user_intent", "create")
+    # For engineering intents, retrieve spec for target level so the LLM
+    # knows the exact output format it must produce.
+    if intent in ("forward_engineer", "reverse_engineer") and state.get("target_level"):
+        level = state["target_level"]
+    else:
+        level = state.get("current_level", "conceptual")
 
     # ── Strategy 1: full file read (preferred for small specs) ───────────
     full_context = await asyncio.to_thread(_read_full_specs, level)

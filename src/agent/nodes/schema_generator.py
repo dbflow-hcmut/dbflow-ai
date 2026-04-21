@@ -275,6 +275,20 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
         *state["messages"],
     ]
 
+    # If this is a validation retry, prepend the issues so the LLM self-corrects.
+    validation_issues = state.get("validation_issues") or []
+    if validation_issues:
+        issues_text = "\n".join(f"- {i}" for i in validation_issues)
+        messages.append(
+            HumanMessage(
+                content=(
+                    f"Your previous output failed schema validation with "
+                    f"{len(validation_issues)} issue(s). Regenerate the COMPLETE "
+                    f"model.json fixing ALL of the following:\n\n{issues_text}"
+                )
+            )
+        )
+
     model_data: Optional[Dict[str, Any]] = None
     response_text = ""
 
@@ -338,9 +352,9 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
 
         summary = (
             f"{ai_description}\n\n"
-            f"<details><summary>📋 model.json</summary>\n\n"
-            f"```json\n{json.dumps(model_data, indent=2, ensure_ascii=False)}\n```\n\n"
-            f"</details>"
+            f"```model.json\n{json.dumps(model_data, indent=2, ensure_ascii=False)}\n```\n\n"
+            f"Schema generated with {len(entity_names)} {'entities' if level == 'conceptual' else 'tables'} "
+            f"and {len(rels)} relationships."
         )
     else:
         summary = (
@@ -382,6 +396,20 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
         ),
         *state["messages"],
     ]
+
+    # If this is a validation retry, prepend the issues so the LLM self-corrects.
+    validation_issues = state.get("validation_issues") or []
+    if validation_issues:
+        issues_text = "\n".join(f"- {i}" for i in validation_issues)
+        messages.append(
+            HumanMessage(
+                content=(
+                    f"Your previous output failed schema validation with "
+                    f"{len(validation_issues)} issue(s). Regenerate the COMPLETE "
+                    f"updated model.json fixing ALL of the following:\n\n{issues_text}"
+                )
+            )
+        )
 
     model_data: Optional[Dict[str, Any]] = None
     response_text = ""
@@ -445,9 +473,9 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
 
         summary = (
             f"{ai_description}\n\n"
-            f"<details><summary>📋 model.json</summary>\n\n"
-            f"```json\n{json.dumps(model_data, indent=2, ensure_ascii=False)}\n```\n\n"
-            f"</details>"
+            f"```model.json\n{json.dumps(model_data, indent=2, ensure_ascii=False)}\n```\n\n"
+            f"Schema updated with {len(entity_names)} {'entities' if level == 'conceptual' else 'tables'} "
+            f"and {len(model_data.get('relationships', []))} relationships."
         )
     else:
         summary = (

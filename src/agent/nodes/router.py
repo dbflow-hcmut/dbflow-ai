@@ -30,12 +30,22 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
     """Analyse the latest user message and classify the intent.
 
     Sets ``state["user_intent"]`` so downstream conditional edges can route.
+    Also syncs ``input_model`` → ``schema_model`` if the frontend provided it.
     """
     model = _make_router_model()
 
+    # Sync input_model from frontend into the schema_model state
+    # This ensures forward/reverse engineering always uses the latest diagram.
+    updates: Dict[str, Any] = {}
+    if state.get("input_model"):
+        updates["schema_model"] = state["input_model"]
+        updates["input_model"] = None  # clear after sync
+
+    effective_schema = updates.get("schema_model") or state.get("schema_model")
+
     # Build context: include info about whether a schema already exists
     context_parts: list[str] = []
-    if state.get("schema_model"):
+    if effective_schema:
         context_parts.append("A schema already exists in the current session.")
     else:
         context_parts.append("No schema exists yet in the current session.")
@@ -51,15 +61,30 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
 
     result: RouterOutput = await model.ainvoke(messages)
 
-    updates: Dict[str, Any] = {"user_intent": result.intent.value}
+    updates["user_intent"] = result.intent.value
 
-    # Only update current_level if the LLM explicitly detected a level from the
-    # user's message.  When `detected_level` is null the frontend-supplied level
-    # (or the existing state value) is preserved.
+    # Reset validation retry state on every new user request.
+    updates["validation_issues"] = []
+    updates["retry_count"] = 0
+    updates["target_level"] = None
+
+    # For forward/reverse engineering: store the detected target level in
+    # `target_level` WITHOUT overwriting `current_level`.  current_level must
+    # stay as the level of the *source* schema so the engineering node reads
+    # the correct source.
+    #
+    # For create/edit: update current_level to what the user specified (or keep
+    # existing value if the user didn't mention a level).
     if result.detected_level and result.detected_level in (
         "conceptual", "logical", "physical"
     ):
-        updates["current_level"] = result.detected_level
+        if result.intent.value in (
+            UserIntent.FORWARD_ENGINEER.value,
+            UserIntent.REVERSE_ENGINEER.value,
+        ):
+            updates["target_level"] = result.detected_level
+        else:
+            updates["current_level"] = result.detected_level
 
     return updates
 
@@ -70,8 +95,8 @@ def route_intent(state: AgentState) -> str:
     mapping = {
         UserIntent.CREATE.value: "schema_generator",
         UserIntent.EDIT.value: "schema_editor",
-        UserIntent.CONVERT.value: "schema_converter",
-        UserIntent.REVERT.value: "reverter",
+        UserIntent.FORWARD_ENGINEER.value: "forward_engineer",
+        UserIntent.REVERSE_ENGINEER.value: "reverse_engineer",
         UserIntent.CHAT.value: "chatbot",
     }
     return mapping.get(intent, "chatbot")

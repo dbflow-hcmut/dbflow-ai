@@ -2,10 +2,11 @@
 
 Graph Flow:
     START -> router -> conditional_edge:
-        "create"  -> retriever -> schema_generator -> validator -> END
-        "edit"    -> retriever -> schema_editor   -> validator -> END
-        "chat"    -> chatbot         -> END
-        (convert / revert  -> placeholder nodes -> END)
+        "create"           -> retriever -> schema_generator  -> validator -> END
+        "edit"             -> retriever -> schema_editor     -> validator -> END
+        "forward_engineer" -> retriever -> forward_engineer  -> validator -> END
+        "reverse_engineer" -> retriever -> reverse_engineer  -> validator -> END
+        "chat"             -> chatbot                                     -> END
 """
 
 from __future__ import annotations
@@ -15,20 +16,25 @@ import os
 from typing import Any, Dict
 
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, StateGraph
 
 from agent.nodes.retriever import retriever_node
 from agent.nodes.router import route_intent, router_node
 from agent.nodes.schema_generator import schema_editor_node, schema_generator_node
+from agent.nodes.engineering import forward_engineer_node, reverse_engineer_node
 from agent.nodes.validator import validator_node
+from agent.models import UserIntent
 from agent.state import AgentState
 
 load_dotenv()
 
+# Maximum number of times the validator can send the LLM back for corrections.
+_MAX_VALIDATION_RETRIES = int(os.getenv("VALIDATION_MAX_RETRIES", "2"))
 
-# ── Fallback / placeholder nodes ────────────────────────────────────────────
+
+# ── Nodes ────────────────────────────────────────────────────────────────────
 
 
 async def chatbot_node(state: AgentState) -> Dict[str, Any]:
@@ -59,21 +65,6 @@ async def chatbot_node(state: AgentState) -> Dict[str, Any]:
     return {"messages": [response]}
 
 
-async def placeholder_node(state: AgentState) -> Dict[str, Any]:
-    """Placeholder for features not yet implemented (convert, revert)."""
-    intent = state.get("user_intent", "unknown")
-    return {
-        "messages": [
-            AIMessage(
-                content=(
-                    f"🚧 The **{intent}** feature is not yet implemented. "
-                    "It will be available in a future update!"
-                )
-            )
-        ]
-    }
-
-
 # ── Build the graph ─────────────────────────────────────────────────────────
 
 
@@ -82,7 +73,35 @@ def _route_after_retriever(state: AgentState) -> str:
     intent = state.get("user_intent", "create")
     if intent == "edit":
         return "schema_editor"
+    if intent == "forward_engineer":
+        return "forward_engineer"
+    if intent == "reverse_engineer":
+        return "reverse_engineer"
     return "schema_generator"
+
+
+def _route_after_validator(state: AgentState) -> str:
+    """After validation, either end or retry the generating node.
+
+    If validation found issues AND the retry budget is not exhausted,
+    route back to the same node that produced the failing schema so the
+    LLM can self-correct using the list of issues as feedback.
+    Bypasses the retriever on retries (retrieval_context is still in state).
+    """
+    issues = state.get("validation_issues") or []
+    retries = state.get("retry_count", 0)
+
+    if not issues or retries > _MAX_VALIDATION_RETRIES:
+        return "__end__"
+
+    intent = state.get("user_intent", "create")
+    mapping = {
+        UserIntent.CREATE.value: "schema_generator",
+        UserIntent.EDIT.value: "schema_editor",
+        UserIntent.FORWARD_ENGINEER.value: "forward_engineer",
+        UserIntent.REVERSE_ENGINEER.value: "reverse_engineer",
+    }
+    return mapping.get(intent, "__end__")
 
 
 def build_graph() -> StateGraph:
@@ -96,45 +115,57 @@ def build_graph() -> StateGraph:
     builder.add_node("schema_editor", schema_editor_node)
     builder.add_node("validator", validator_node)
     builder.add_node("chatbot", chatbot_node)
-    builder.add_node("schema_converter", placeholder_node)
-    builder.add_node("reverter", placeholder_node)
+    builder.add_node("forward_engineer", forward_engineer_node)
+    builder.add_node("reverse_engineer", reverse_engineer_node)
 
     # Entry point
     builder.add_edge("__start__", "router")
 
     # Router -> conditional dispatch
-    # create / edit go through retriever first to fetch schema specs from RAG
+    # All schema-generating intents go through retriever to fetch target-level specs
     builder.add_conditional_edges(
         "router",
         route_intent,
         {
-            "schema_generator": "retriever",  # create -> retriever first
-            "schema_editor": "retriever",      # edit -> retriever first
-            "schema_converter": "schema_converter",
-            "reverter": "reverter",
+            "schema_generator": "retriever",
+            "schema_editor": "retriever",
+            "forward_engineer": "retriever",   # needs target-level spec
+            "reverse_engineer": "retriever",   # needs target-level spec
             "chatbot": "chatbot",
         },
     )
 
-    # Retriever -> conditional: schema_generator or schema_editor
+    # Retriever -> conditional: route to the correct generation node
     builder.add_conditional_edges(
         "retriever",
         _route_after_retriever,
         {
             "schema_generator": "schema_generator",
             "schema_editor": "schema_editor",
+            "forward_engineer": "forward_engineer",
+            "reverse_engineer": "reverse_engineer",
         },
     )
 
-    # schema_generator / schema_editor -> validator -> END
+    # schema_generator / schema_editor / engineering nodes -> validator -> conditional retry or END
     builder.add_edge("schema_generator", "validator")
     builder.add_edge("schema_editor", "validator")
-    builder.add_edge("validator", END)
+    builder.add_edge("forward_engineer", "validator")
+    builder.add_edge("reverse_engineer", "validator")
+    builder.add_conditional_edges(
+        "validator",
+        _route_after_validator,
+        {
+            "schema_generator": "schema_generator",
+            "schema_editor": "schema_editor",
+            "forward_engineer": "forward_engineer",
+            "reverse_engineer": "reverse_engineer",
+            "__end__": END,
+        },
+    )
 
     # Other nodes -> END directly
     builder.add_edge("chatbot", END)
-    builder.add_edge("schema_converter", END)
-    builder.add_edge("reverter", END)
 
     return builder
 

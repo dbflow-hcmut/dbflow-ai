@@ -36,8 +36,8 @@ class UserIntent(str, Enum):
 
     CREATE = "create"
     EDIT = "edit"
-    CONVERT = "convert"
-    REVERT = "revert"
+    FORWARD_ENGINEER = "forward_engineer"
+    REVERSE_ENGINEER = "reverse_engineer"
     CHAT = "chat"
 
 

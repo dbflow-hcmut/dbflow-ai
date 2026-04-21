@@ -239,13 +239,18 @@ async def validator_node(state: AgentState) -> Dict[str, Any]:
 
     Runs both JSON Schema validation (if the spec file exists) and generic
     structural checks.  All blocking work is offloaded to a thread.
+
+    Returns ``validation_issues`` in state so the graph can route back to
+    the generating node for a self-correction retry when issues are found.
     """
     raw_model = state.get("schema_model")
     level = state.get("current_level", "conceptual")
 
     if not raw_model:
         return {
-            "messages": [AIMessage(content="⚠️ No schema to validate.")]
+            "messages": [AIMessage(content="No schema to validate.")],
+            "validation_issues": [],
+            "retry_count": 0,
         }
 
     # Run all blocking validation in a separate thread
@@ -253,14 +258,20 @@ async def validator_node(state: AgentState) -> Dict[str, Any]:
         _run_validation, raw_model, None, level
     )
 
-    # Build response message
     if not all_issues:
-        msg = "✅ **Schema validation passed.** No issues found."
-    else:
-        details = "\n".join(f"- {issue}" for issue in all_issues)
-        msg = (
-            f"⚠️ **Schema validation found {len(all_issues)} issue(s):**\n\n"
-            f"{details}"
-        )
+        return {
+            "messages": [AIMessage(content="Schema validation passed. No issues found.")],
+            "validation_issues": [],
+            "retry_count": 0,
+        }
 
-    return {"messages": [AIMessage(content=msg)]}
+    details = "\n".join(f"- {issue}" for issue in all_issues)
+    msg = (
+        f"Schema validation found {len(all_issues)} issue(s):\n\n"
+        f"{details}"
+    )
+    return {
+        "messages": [AIMessage(content=msg)],
+        "validation_issues": all_issues,
+        "retry_count": state.get("retry_count", 0) + 1,
+    }

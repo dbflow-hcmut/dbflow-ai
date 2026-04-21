@@ -58,6 +58,11 @@
         "id": { "type": "string", "pattern": "^lid_" },
         "name": { "type": "string" },
 
+        "type": {
+          "description": "Optional logical data type hint (e.g. VARCHAR, INTEGER). Not DBMS-specific.",
+          "type": "string"
+        },
+
         "nullable": { "type": "boolean", "default": true },
         "unique": { "type": "boolean", "default": false },
 

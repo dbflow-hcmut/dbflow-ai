@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -57,13 +58,13 @@ def _validate_with_json_schema(
     try:
         import jsonschema  # already installed (chromadb dependency)
     except ImportError:
-        return [f"⚠️ `jsonschema` package not installed — skipping {label} validation."]
+        return [f" `jsonschema` package not installed — skipping {label} validation."]
 
     issues: List[str] = []
     validator = jsonschema.Draft201909Validator(json_schema)
     for error in sorted(validator.iter_errors(data), key=lambda e: list(e.path)):
         path = ".".join(str(p) for p in error.absolute_path) or "(root)"
-        issues.append(f"❌ **{label}** `{path}`: {error.message}")
+        issues.append(f" **{label}** `{path}`: {error.message}")
 
     return issues
 
@@ -95,7 +96,7 @@ def _check_conceptual(data: dict, issues: List[str]) -> None:
     # Duplicate entity names
     names = [e.get("name", "") for e in entities if isinstance(e, dict)]
     for name in set(n for n in names if names.count(n) > 1):
-        issues.append(f"⚠️ Duplicate entity name: `{name}`.")
+        issues.append(f" Duplicate entity name: `{name}`.")
 
     # Every entity should have at least one key attribute
     for ent in entities:
@@ -107,7 +108,7 @@ def _check_conceptual(data: dict, issues: List[str]) -> None:
         has_key = any(a.get("isKey") for a in attrs if isinstance(a, dict))
         if not has_key and ent.get("kind", "strong") == "strong":
             issues.append(
-                f"⚠️ Entity `{ent.get('name')}` (strong) has no key attribute."
+                f" Entity `{ent.get('name')}` (strong) has no key attribute."
             )
 
     # Relationship ends reference valid entity IDs
@@ -121,7 +122,7 @@ def _check_conceptual(data: dict, issues: List[str]) -> None:
             eid = end.get("entityId")
             if eid and eid not in entity_ids:
                 issues.append(
-                    f"❌ Relationship `{rel.get('name')}` references "
+                    f" Relationship `{rel.get('name')}` references "
                     f"non-existent entity `{eid}`."
                 )
 
@@ -134,7 +135,7 @@ def _check_logical(data: dict, issues: List[str]) -> None:
     # Duplicate table names
     names = [t.get("name", "") for t in tables if isinstance(t, dict)]
     for name in set(n for n in names if names.count(n) > 1):
-        issues.append(f"⚠️ Duplicate table name: `{name}`.")
+        issues.append(f" Duplicate table name: `{name}`.")
 
     table_ids = {t.get("id") for t in tables if isinstance(t, dict)}
     col_index: Dict[str, set] = {}
@@ -161,7 +162,7 @@ def _check_logical(data: dict, issues: List[str]) -> None:
             c.get("roles", {}).get("primaryKey") for c in columns if isinstance(c, dict)
         )
         if not has_pk:
-            issues.append(f"⚠️ Table `{tname}` has no primary key column.")
+            issues.append(f" Table `{tname}` has no primary key column.")
 
         # FK references must point to valid tables/columns
         for col in columns:
@@ -173,12 +174,12 @@ def _check_logical(data: dict, issues: List[str]) -> None:
                 ref_cid = fk.get("refColumnId")
                 if ref_tid and ref_tid not in table_ids:
                     issues.append(
-                        f"❌ FK `{tname}.{col.get('name')}` references "
+                        f" FK `{tname}.{col.get('name')}` references "
                         f"non-existent table `{ref_tid}`."
                     )
                 elif ref_cid and ref_cid not in col_index.get(ref_tid, set()):
                     issues.append(
-                        f"❌ FK `{tname}.{col.get('name')}` references "
+                        f" FK `{tname}.{col.get('name')}` references "
                         f"non-existent column `{ref_cid}` in `{ref_tid}`."
                     )
 
@@ -199,7 +200,7 @@ def _check_physical(data: dict, issues: List[str]) -> None:
             names = [t.get("name", "") for t in tables if isinstance(t, dict)]
             for name in set(n for n in names if names.count(n) > 1):
                 issues.append(
-                    f"⚠️ Duplicate table name in schema "
+                    f" Duplicate table name in schema "
                     f"`{schema.get('name')}`: `{name}`."
                 )
 
@@ -259,19 +260,32 @@ async def validator_node(state: AgentState) -> Dict[str, Any]:
     )
 
     if not all_issues:
+        # Validation passed — no message needed, the schema node already sent one.
         return {
-            "messages": [AIMessage(content="Schema validation passed. No issues found.")],
             "validation_issues": [],
             "retry_count": 0,
         }
 
-    details = "\n".join(f"- {issue}" for issue in all_issues)
-    msg = (
-        f"Schema validation found {len(all_issues)} issue(s):\n\n"
-        f"{details}"
-    )
+    current_retry = state.get("retry_count", 0)
+    new_retry_count = current_retry + 1
+    max_retries = int(os.getenv("VALIDATION_MAX_RETRIES", "2"))
+
+    if new_retry_count > max_retries:
+        # Retries exhausted — show full issue list as a warning.
+        details = "\n".join(f"- {issue}" for issue in all_issues)
+        msg = (
+            f"Schema has {len(all_issues)} validation issue(s) that could not be "
+            f"auto-corrected after {max_retries} attempt(s):\n\n{details}"
+        )
+    else:
+        # Will retry — show brief message only, not the full error list.
+        msg = (
+            f"Found {len(all_issues)} validation issue(s), "
+            f"auto-correcting schema (attempt {new_retry_count}/{max_retries})..."
+        )
+
     return {
         "messages": [AIMessage(content=msg)],
         "validation_issues": all_issues,
-        "retry_count": state.get("retry_count", 0) + 1,
+        "retry_count": new_retry_count,
     }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict
 
@@ -85,6 +86,27 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
             updates["target_level"] = result.detected_level
         else:
             updates["current_level"] = result.detected_level
+
+    # Compute the effective schema level the AI will generate.
+    # For create/edit: the current_level (possibly just updated above).
+    # For forward/reverse engineering: the target_level.
+    effective_level = (
+        updates.get("target_level")
+        or updates.get("current_level")
+        or state.get("current_level", "conceptual")
+    )
+
+    # Emit routing info as an AIMessage so the frontend can read intent,
+    # detected_level, AND effective_level through the streaming SSE.
+    routing_msg = AIMessage(
+        content=json.dumps({
+            "intent": result.intent.value,
+            "detected_level": result.detected_level,
+            "effective_level": effective_level,
+            "reasoning": result.reasoning,
+        })
+    )
+    updates["messages"] = [routing_msg]
 
     return updates
 

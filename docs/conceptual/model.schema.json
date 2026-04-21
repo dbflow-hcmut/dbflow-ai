@@ -171,7 +171,9 @@
 
         "cardinality": { "type": "string" },
 
-        "optional": { "type": "boolean" }
+        "optional": { "type": "boolean" },
+
+        "notes": { "type": "string" }
       }
     },
 

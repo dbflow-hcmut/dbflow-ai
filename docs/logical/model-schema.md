@@ -37,6 +37,7 @@ The AI must produce output that conforms **exactly** to this specification.
 |------------|---------|----------|----------------------------------------------------|
 | `id`       | string  | ✅       | Unique ID, prefix `lid_` (e.g. `lid_student_name`).|
 | `name`     | string  | ✅       | Column name in **snake_case**.                     |
+| `type`     | string  |          | Optional logical data type hint (e.g. `VARCHAR`, `INTEGER`). Not DBMS-specific. |
 | `nullable` | boolean |          | Allow NULL (default `true`).                       |
 | `unique`   | boolean |          | UNIQUE constraint (default `false`).               |
 | `roles`    | object  |          | Key roles (see below).                             |

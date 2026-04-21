@@ -33,7 +33,7 @@ _MAX_RETRIES = int(os.getenv("SCHEMA_GEN_MAX_RETRIES", "2"))
 
 def _short_uid() -> str:
     """Return a short 8-char hex string for ID uniqueness."""
-    return uuid.uuid4().hex[:8]
+    return uuid.uuid().hex[:8]
 
 
 def _ensure_unique_ids(model_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -358,14 +358,18 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
         )
     else:
         summary = (
-            f"⚠️ Could not parse structured output. Raw response:\n\n{response_text}"
+            f"Could not parse structured output. Raw response:\n\n{response_text}"
         )
+
+    # Suppress message during validation retries — the validator already emitted
+    # a "auto-correcting..." notice; show the schema only after validation passes.
+    outgoing_messages = [] if validation_issues else [AIMessage(content=summary)]
 
     return {
         "schema_model": model_data,
         "history": history,
         "current_level": level,
-        "messages": [AIMessage(content=summary)],
+        "messages": outgoing_messages,
     }
 
 
@@ -479,12 +483,15 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
         )
     else:
         summary = (
-            f"⚠️ Could not parse structured output. Raw response:\n\n{response_text}"
+            f"Could not parse structured output. Raw response:\n\n{response_text}"
         )
+
+    # Suppress message during validation retries — validator already shows "auto-correcting..."
+    outgoing_messages = [] if validation_issues else [AIMessage(content=summary)]
 
     return {
         "schema_model": model_data or state.get("schema_model"),
         "history": history,
         "current_level": level,
-        "messages": [AIMessage(content=summary)],
+        "messages": outgoing_messages,
     }

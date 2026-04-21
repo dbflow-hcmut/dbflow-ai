@@ -70,7 +70,7 @@ async def forward_engineer_node(state: AgentState) -> Dict[str, Any]:
             "messages": [
                 AIMessage(
                     content=(
-                        "⚠️ No schema found to forward engineer. "
+                        " No schema found to forward engineer. "
                         "Please create a schema first, or describe what you'd like to design."
                     )
                 )
@@ -164,7 +164,7 @@ async def forward_engineer_node(state: AgentState) -> Dict[str, Any]:
         )
     else:
         summary = (
-            f"⚠️ Could not generate the forward-engineered schema. "
+            f"Could not generate the forward-engineered schema. "
             f"Raw response:\n\n{response_text}"
         )
 
@@ -172,7 +172,8 @@ async def forward_engineer_node(state: AgentState) -> Dict[str, Any]:
         "schema_model": model_data or source_schema,
         "history": history,
         "current_level": target_level,
-        "messages": [AIMessage(content=summary)],
+        # Suppress message during validation retries — validator already shows "auto-correcting..."
+        "messages": [] if validation_issues else [AIMessage(content=summary)],
     }
 
 
@@ -290,7 +291,7 @@ async def reverse_engineer_node(state: AgentState) -> Dict[str, Any]:
         )
     else:
         summary = (
-            f"⚠️ Could not parse the reverse-engineered schema. "
+            f"Could not parse the reverse-engineered schema. "
             f"Raw response:\n\n{response_text}"
         )
 
@@ -298,5 +299,6 @@ async def reverse_engineer_node(state: AgentState) -> Dict[str, Any]:
         "schema_model": model_data,
         "history": history,
         "current_level": target_level,
-        "messages": [AIMessage(content=summary)],
+        # Suppress message during validation retries — validator already shows "auto-correcting..."
+        "messages": [] if validation_issues else [AIMessage(content=summary)],
     }

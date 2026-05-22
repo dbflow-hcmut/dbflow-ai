@@ -94,7 +94,15 @@ async def retriever_node(state: AgentState) -> Dict[str, Any]:
     last_message = ""
     for msg in reversed(state["messages"]):
         if isinstance(msg, HumanMessage):
-            last_message = msg.content
+            # content may be a list of parts (multimodal) — extract text only
+            raw = msg.content
+            if isinstance(raw, str):
+                last_message = raw
+            elif isinstance(raw, list):
+                last_message = " ".join(
+                    part["text"] for part in raw
+                    if isinstance(part, dict) and part.get("type") == "text"
+                )
             break
 
     intent = state.get("user_intent", "create")

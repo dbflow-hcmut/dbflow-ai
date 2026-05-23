@@ -23,6 +23,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from agent.prompts import SCHEMA_EDITOR_PROMPT, SCHEMA_GENERATOR_PROMPT, LEVEL_INSTRUCTIONS
 from agent.state import AgentState
+from agent.utils import resolve_image_urls
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -270,10 +271,8 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
         level_specific_instructions=level_instructions,
     )
 
-    messages = [
-        SystemMessage(content=prompt),
-        *state["messages"],
-    ]
+    messages = [SystemMessage(content=prompt), *state["messages"]]
+    messages = await resolve_image_urls(messages)
 
     # If this is a validation retry, prepend the issues so the LLM self-corrects.
     validation_issues = state.get("validation_issues") or []
@@ -400,6 +399,7 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
         ),
         *state["messages"],
     ]
+    messages = await resolve_image_urls(messages)
 
     # If this is a validation retry, prepend the issues so the LLM self-corrects.
     validation_issues = state.get("validation_issues") or []

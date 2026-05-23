@@ -30,6 +30,7 @@ from agent.nodes.schema_generator import (
 )
 from agent.prompts import FORWARD_ENGINEER_PROMPT, LEVEL_INSTRUCTIONS, REVERSE_ENGINEER_PROMPT
 from agent.state import AgentState
+from agent.utils import resolve_image_urls
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -90,6 +91,7 @@ async def forward_engineer_node(state: AgentState) -> Dict[str, Any]:
         SystemMessage(content=prompt),
         *state["messages"],
     ]
+    messages_to_send = await resolve_image_urls(messages_to_send)
 
     # Inject validation feedback if this is a self-correction retry.
     validation_issues = state.get("validation_issues") or []
@@ -204,6 +206,7 @@ async def reverse_engineer_node(state: AgentState) -> Dict[str, Any]:
         SystemMessage(content=prompt),
         *state["messages"],
     ]
+    messages_to_send = await resolve_image_urls(messages_to_send)
 
     # Inject validation feedback if this is a self-correction retry.
     validation_issues = state.get("validation_issues") or []

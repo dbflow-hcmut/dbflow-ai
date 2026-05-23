@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+import base64
+import io
+import logging
 import math
+from typing import Any, List
+
+import httpx
+from docx import Document
+from langchain_core.messages import AnyMessage, HumanMessage
 
 from agent.models import (
     DiagramEdge,
@@ -13,6 +21,83 @@ from agent.models import (
     SchemaModel,
     Viewport,
 )
+
+logger = logging.getLogger(__name__)
+
+# ── Async image pre-fetch ────────────────────────────────────────────────────
+
+
+DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def _extract_docx_text(content: bytes) -> str:
+    """Extract plain text from a DOCX file bytes."""
+    doc = Document(io.BytesIO(content))
+    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+    return "\n".join(paragraphs)
+
+
+async def resolve_image_urls(messages: List[AnyMessage]) -> List[AnyMessage]:
+    """Replace HTTPS image_url parts with inline base64 data URLs.
+
+    langchain_google_genai fetches HTTP image URLs synchronously via requests,
+    which triggers a BlockingError inside LangGraph's async event loop.
+    This function pre-fetches all remote images asynchronously with httpx and
+    converts them to data URIs so the LLM library never makes a blocking call.
+
+    DOCX files are not supported by Gemini as image_url — they are downloaded
+    and converted to plain text parts instead.
+    """
+    resolved: List[AnyMessage] = []
+    async with httpx.AsyncClient(timeout=30) as client:
+        for msg in messages:
+            if not isinstance(msg, HumanMessage):
+                resolved.append(msg)
+                continue
+
+            content = msg.content
+            if not isinstance(content, list):
+                resolved.append(msg)
+                continue
+
+            new_parts: List[Any] = []
+            changed = False
+            for part in content:
+                if (
+                    isinstance(part, dict)
+                    and part.get("type") == "image_url"
+                    and isinstance(part.get("image_url"), dict)
+                ):
+                    url: str = part["image_url"].get("url", "")
+                    if url.startswith("http://") or url.startswith("https://"):
+                        try:
+                            resp = await client.get(url)
+                            resp.raise_for_status()
+                            mime = resp.headers.get("content-type", "image/jpeg").split(";")[0]
+
+                            if mime == DOCX_MIME or url.lower().endswith(".docx"):
+                                # Gemini doesn't support DOCX — extract text instead
+                                text = _extract_docx_text(resp.content)
+                                new_parts.append({"type": "text", "text": f"[Word document content]\n{text}"})
+                                changed = True
+                                logger.debug("Extracted text from DOCX URL: %s", url[:80])
+                            else:
+                                b64 = base64.b64encode(resp.content).decode()
+                                data_url = f"data:{mime};base64,{b64}"
+                                new_parts.append({"type": "image_url", "image_url": {"url": data_url}})
+                                changed = True
+                                logger.debug("Resolved image URL to base64: %s", url[:80])
+                            continue
+                        except Exception as exc:
+                            logger.warning("Failed to fetch URL %s: %s", url[:80], exc)
+                new_parts.append(part)
+
+            if changed:
+                resolved.append(HumanMessage(content=new_parts))
+            else:
+                resolved.append(msg)
+
+    return resolved
 
 # Layout constants
 NODE_WIDTH = 220

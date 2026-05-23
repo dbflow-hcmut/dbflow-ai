@@ -27,6 +27,7 @@ from agent.nodes.engineering import forward_engineer_node, reverse_engineer_node
 from agent.nodes.validator import validator_node
 from agent.models import UserIntent
 from agent.state import AgentState
+from agent.utils import resolve_image_urls
 
 load_dotenv()
 
@@ -61,6 +62,7 @@ async def chatbot_node(state: AgentState) -> Dict[str, Any]:
         )
 
     messages = [SystemMessage(content="\n".join(context_parts)), *state["messages"]]
+    messages = await resolve_image_urls(messages)
     response = await llm.ainvoke(messages)
     return {"messages": [response]}
 

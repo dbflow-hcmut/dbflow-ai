@@ -13,6 +13,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from agent.models import RouterOutput, UserIntent
 from agent.prompts import ROUTER_PROMPT
 from agent.state import AgentState
+from agent.utils import resolve_image_urls
 
 load_dotenv()
 
@@ -59,6 +60,7 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
         context_msg,
         *state["messages"],
     ]
+    messages = await resolve_image_urls(messages)
 
     result: RouterOutput = await model.ainvoke(messages)
 

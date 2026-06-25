@@ -42,3 +42,6 @@ class AgentState(TypedDict):
     retrieval_context: Optional[str]
     validation_issues: List[str]  # issues from last validator run (empty = passed)
     retry_count: int  # number of validator-triggered retries for this request
+    project_id: Optional[str]
+    project_docs_context: Optional[str]
+    project_docs_candidates: Optional[List[Dict[str, Any]]]  # [{page_content, metadata, score}] before reranking

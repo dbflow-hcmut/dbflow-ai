@@ -32,6 +32,22 @@ logger = logging.getLogger(__name__)
 _MAX_RETRIES = int(os.getenv("SCHEMA_GEN_MAX_RETRIES", "2"))
 
 
+def _count_relationships(model_data: Dict[str, Any], level: str) -> int:
+    """Count relationships in a model, handling all schema levels.
+
+    Conceptual: top-level `relationships` array.
+    Logical/Physical: FK columns inside each table (column.roles.foreignKey).
+    """
+    if level == "conceptual":
+        return len(model_data.get("relationships", []))
+    fk_count = 0
+    for table in model_data.get("tables", []):
+        for col in table.get("columns", []):
+            if col.get("roles", {}).get("foreignKey"):
+                fk_count += 1
+    return fk_count
+
+
 def _short_uid() -> str:
     """Return a short 8-char hex string for ID uniqueness."""
     return uuid.uuid().hex[:8]
@@ -269,6 +285,7 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
         retrieval_context=retrieval_context,
         current_level=level,
         level_specific_instructions=level_instructions,
+        project_docs_context=state.get("project_docs_context") or "",
     )
 
     messages = [SystemMessage(content=prompt), *state["messages"]]
@@ -337,7 +354,7 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
     if model_data:
         entities = model_data.get("entities", []) or model_data.get("tables", [])
         entity_names = [e.get("name", "?") for e in entities]
-        rels = model_data.get("relationships", [])
+        rel_count = _count_relationships(model_data, level)
 
         # Extract the human-readable description from the LLM response
         ai_description = _extract_text_before_json(response_text)
@@ -346,14 +363,14 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
                 f"I've designed a {level} schema with {len(entity_names)} "
                 f"entities ({', '.join(entity_names[:5])}"
                 f"{'...' if len(entity_names) > 5 else ''}) "
-                f"and {len(rels)} relationships."
+                f"and {rel_count} relationships."
             )
 
         summary = (
             f"{ai_description}\n\n"
             f"```model.json\n{json.dumps(model_data, indent=2, ensure_ascii=False)}\n```\n\n"
             f"Schema generated with {len(entity_names)} {'entities' if level == 'conceptual' else 'tables'} "
-            f"and {len(rels)} relationships."
+            f"and {rel_count} relationships."
         )
     else:
         summary = (
@@ -386,6 +403,7 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
         retrieval_context=retrieval_context,
         current_level=level,
         level_specific_instructions=level_instructions,
+        project_docs_context=state.get("project_docs_context") or "",
     )
 
     current_model_json = json.dumps(
@@ -466,20 +484,21 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
     if model_data:
         entities = model_data.get("entities", []) or model_data.get("tables", [])
         entity_names = [e.get("name", "?") for e in entities]
+        rel_count = _count_relationships(model_data, level)
 
         # Extract the human-readable description from the LLM response
         ai_description = _extract_text_before_json(response_text)
         if not ai_description:
             ai_description = (
                 f"I've updated the {level} schema. It now has {len(entity_names)} "
-                f"entities and {len(model_data.get('relationships', []))} relationships."
+                f"entities and {rel_count} relationships."
             )
 
         summary = (
             f"{ai_description}\n\n"
             f"```model.json\n{json.dumps(model_data, indent=2, ensure_ascii=False)}\n```\n\n"
             f"Schema updated with {len(entity_names)} {'entities' if level == 'conceptual' else 'tables'} "
-            f"and {len(model_data.get('relationships', []))} relationships."
+            f"and {rel_count} relationships."
         )
     else:
         summary = (

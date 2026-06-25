@@ -90,6 +90,12 @@ async def resolve_image_urls(messages: List[AnyMessage]) -> List[AnyMessage]:
                             continue
                         except Exception as exc:
                             logger.warning("Failed to fetch URL %s: %s", url[:80], exc)
+                            # Replace with text placeholder so the LLM library never
+                            # sees the raw HTTPS URL — it would fetch it synchronously
+                            # via requests, triggering a BlockingError in the ASGI loop.
+                            new_parts.append({"type": "text", "text": f"[Image unavailable: {url[:80]}]"})
+                            changed = True
+                            continue
                 new_parts.append(part)
 
             if changed:

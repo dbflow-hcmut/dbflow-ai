@@ -1,40 +1,45 @@
-"""Retriever node — hybrid: read full spec files when small, fallback to RAG.
+"""Retriever node — reads full spec files + fetches project-doc candidates for re-ranking.
 
-For each schema level the spec files (model-schema.md + diagram-schema.md) are
-tiny (~5 KB).  Reading them in full guarantees the LLM sees 100 % of the format
-rules.  If specs ever grow beyond a configurable threshold, we fall back to
-ChromaDB RAG retrieval automatically.
+Spec (schema_docs): always read full file per level — no size threshold, no ChromaDB fallback.
+  Rationale: spec is the source of truth for output format; any truncation risks wrong output.
+
+Project docs: fetch top-N candidates (N = RERANK_CANDIDATES_K, default 12) with cosine scores
+  so the downstream reranker_node can apply hybrid BM25 + semantic scoring before final selection.
+  Skipped entirely when project has no documents.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import HumanMessage
 
-from agent.models import UserIntent
-from agent.rag import aretrieve, format_retrieved_context
+from agent.rag import aretrieve_project_docs_with_score
 from agent.state import AgentState
+
+logger = logging.getLogger(__name__)
 
 # ── Paths & config ───────────────────────────────────────────────────────────
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]  # dbflow-ai/
 _DOCS_DIR = _PROJECT_ROOT / "docs"
 
-# If total spec size exceeds this, fall back to RAG chunked retrieval
-_FULL_READ_THRESHOLD_BYTES = 30_000  # 30 KB
+# Number of project-doc candidates to fetch for re-ranking (3× the final top-k)
+_RERANK_CANDIDATES_K = 12
 
 
-def _read_full_specs(level: str) -> str | None:
-    """Read full model-schema.md + diagram-schema.md for *level*.
+def _read_full_specs(level: str) -> Optional[str]:
+    """Read full model-schema.md + model.schema.json for *level*.
 
-    Returns the combined text if total size is below the threshold,
-    otherwise returns ``None`` to signal that RAG should be used.
+    Always returns full content — no size threshold.
+    Returns None only if the level directory or files are missing.
     """
     level_dir = _DOCS_DIR / level
     if not level_dir.is_dir():
+        logger.warning("Spec directory not found for level '%s': %s", level, level_dir)
         return None
 
     spec_files: List[Path] = []
@@ -44,11 +49,8 @@ def _read_full_specs(level: str) -> str | None:
             spec_files.append(f)
 
     if not spec_files:
+        logger.warning("No spec files found for level '%s'", level)
         return None
-
-    total_size = sum(f.stat().st_size for f in spec_files)
-    if total_size > _FULL_READ_THRESHOLD_BYTES:
-        return None  # too large → fall back to RAG
 
     sections: List[str] = []
     for f in spec_files:
@@ -59,63 +61,61 @@ def _read_full_specs(level: str) -> str | None:
     return "\n\n---\n\n".join(sections)
 
 
-def _pick_filters(state: AgentState) -> dict:
-    """Determine which doc_type / level to filter by based on intent + current_level."""
-    level = state.get("current_level", "conceptual")
-    intent = state.get("user_intent", "create")
-    return {"level": level, "doc_type": None}
-
-
-async def retriever_node(state: AgentState) -> Dict[str, Any]:
-    """Retrieve schema specification docs — hybrid strategy.
-
-    For forward/reverse engineering, fetches specs for the **target level**
-    (where the output will land), not the source level.
-    For create/edit, fetches specs for the current level.
-
-    1. Try reading the full spec files for the level.
-       If total size < 30 KB → use the full text (guarantees 100 % coverage).
-    2. If files are too large or missing → fall back to ChromaDB RAG.
-    """
-    intent = state.get("user_intent", "create")
-    # For engineering intents, retrieve spec for target level so the LLM
-    # knows the exact output format it must produce.
-    if intent in ("forward_engineer", "reverse_engineer") and state.get("target_level"):
-        level = state["target_level"]
-    else:
-        level = state.get("current_level", "conceptual")
-
-    # ── Strategy 1: full file read (preferred for small specs) ───────────
-    full_context = await asyncio.to_thread(_read_full_specs, level)
-    if full_context:
-        return {"retrieval_context": full_context}
-
-    # ── Strategy 2: RAG fallback ─────────────────────────────────────────
-    last_message = ""
+def _extract_last_message(state: AgentState) -> str:
+    """Extract plain text from the last HumanMessage in state."""
     for msg in reversed(state["messages"]):
         if isinstance(msg, HumanMessage):
-            # content may be a list of parts (multimodal) — extract text only
             raw = msg.content
             if isinstance(raw, str):
-                last_message = raw
-            elif isinstance(raw, list):
-                last_message = " ".join(
+                return raw
+            if isinstance(raw, list):
+                return " ".join(
                     part["text"] for part in raw
                     if isinstance(part, dict) and part.get("type") == "text"
                 )
-            break
+    return ""
 
-    intent = state.get("user_intent", "create")
-    query = f"[{level} level] [{intent}] {last_message}"
-    filters = _pick_filters(state)
 
-    model_docs = await aretrieve(
-        query=query,
-        level=filters["level"],
-        doc_type="model",
-        k=6,
-    )
+async def retriever_node(state: AgentState) -> Dict[str, Any]:
+    """Retrieve spec docs (full) and project-doc candidates (with scores).
 
-    context = format_retrieved_context(model_docs)
+    Spec retrieval:
+      - Always reads full spec files for the active level (no ChromaDB fallback).
 
-    return {"retrieval_context": context}
+    Project-doc retrieval:
+      - Fetches top-N candidates with cosine scores.
+      - Stored in ``project_docs_candidates`` for reranker_node to process.
+      - Skipped (candidates = None) when no project_id is present.
+    """
+    level = state.get("current_level", "conceptual")
+
+    last_message = _extract_last_message(state)
+
+    # ── Spec: always full read, no fallback ──────────────────────────────
+    retrieval_context = await asyncio.to_thread(_read_full_specs, level) or ""
+
+    # ── Project docs: fetch candidates with scores for reranker ──────────
+    project_docs_candidates = None
+    project_id = state.get("project_id")
+    if project_id:
+        query = last_message or "database schema design"
+        raw_results = await aretrieve_project_docs_with_score(
+            query=query,
+            project_id=project_id,
+            k=_RERANK_CANDIDATES_K,
+        )
+        # Serialize to plain dicts so state remains JSON-serializable
+        project_docs_candidates = [
+            {
+                "page_content": doc.page_content,
+                "metadata": doc.metadata,
+                "score": float(score),
+            }
+            for doc, score in raw_results
+        ]
+
+    return {
+        "retrieval_context": retrieval_context,
+        "project_docs_context": "",           # filled by reranker_node
+        "project_docs_candidates": project_docs_candidates,
+    }

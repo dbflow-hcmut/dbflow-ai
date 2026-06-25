@@ -277,6 +277,115 @@ async def aretrieve(
 retrieve = _retrieve_sync
 
 
+# ── Project-docs vector store ─────────────────────────────────────────────────
+
+_project_vectorstore = None
+
+
+def get_project_vectorstore():
+    """Return a ChromaDB vectorstore for the ``project_docs`` collection.
+
+    Unlike ``get_or_create_vectorstore``, no hash/rebuild logic is needed
+    because this collection is populated dynamically via the ingest sidecar.
+    The instance is cached module-level for the lifetime of the process.
+    """
+    global _project_vectorstore
+    if _project_vectorstore is None:
+        from langchain_community.vectorstores import Chroma
+
+        CHROMA_PERSIST_DIR.mkdir(parents=True, exist_ok=True)
+        embeddings = _get_embeddings()
+        _project_vectorstore = Chroma(
+            collection_name="project_docs",
+            embedding_function=embeddings,
+            persist_directory=str(CHROMA_PERSIST_DIR),
+        )
+    return _project_vectorstore
+
+
+def _retrieve_project_docs_sync(
+    query: str,
+    project_id: str,
+    k: int = 4,
+) -> List[Document]:
+    """Synchronous project-docs retrieval — runs inside a thread."""
+    vs = get_project_vectorstore()
+    try:
+        return vs.similarity_search(query, k=k, filter={"project_id": project_id})
+    except Exception:
+        # ChromaDB raises InternalError when collection is empty or has no matching docs.
+        return []
+
+
+async def aretrieve_project_docs(
+    query: str,
+    project_id: str,
+    k: int = 4,
+) -> List[Document]:
+    """Async retrieval of project-specific uploaded documents.
+
+    Args:
+        query: Natural-language query to match against embedded chunks.
+        project_id: Filter results to this project only.
+        k: Number of results to return.
+
+    Returns:
+        List of relevant Document objects.
+    """
+    return await asyncio.to_thread(_retrieve_project_docs_sync, query, project_id, k)
+
+
+def _retrieve_project_docs_with_score_sync(
+    query: str,
+    project_id: str,
+    k: int = 12,
+) -> List[tuple]:
+    """Synchronous project-docs retrieval with relevance scores — runs inside a thread.
+
+    Returns List[Tuple[Document, float]] where score is cosine similarity (higher = more relevant).
+    """
+    vs = get_project_vectorstore()
+    try:
+        return vs.similarity_search_with_score(query, k=k, filter={"project_id": project_id})
+    except Exception:
+        return []
+
+
+async def aretrieve_project_docs_with_score(
+    query: str,
+    project_id: str,
+    k: int = 12,
+) -> List[tuple]:
+    """Async retrieval of project docs with relevance scores for re-ranking.
+
+    Args:
+        query: Natural-language query to match against embedded chunks.
+        project_id: Filter results to this project only.
+        k: Number of candidates to fetch (should be larger than final top-k to give re-ranker margin).
+
+    Returns:
+        List of (Document, score) tuples where score is cosine similarity in [0, 1].
+    """
+    return await asyncio.to_thread(_retrieve_project_docs_with_score_sync, query, project_id, k)
+
+
+def format_project_docs_context(docs: List[Document]) -> str:
+    """Format project-document chunks into a context string for the LLM.
+
+    Each document is rendered as a titled section separated by horizontal rules.
+    Returns an empty string when no documents were retrieved.
+    """
+    if not docs:
+        return ""
+
+    sections: List[str] = []
+    for doc in docs:
+        title = doc.metadata.get("title", "Untitled")
+        sections.append(f"[{title}]\n{doc.page_content}")
+
+    return "\n\n---\n\n".join(sections)
+
+
 def format_retrieved_context(docs: List[Document]) -> str:
     """Format retrieved documents into a context string for the LLM."""
     if not docs:

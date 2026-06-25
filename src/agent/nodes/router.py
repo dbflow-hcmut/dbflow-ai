@@ -36,8 +36,7 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
     """
     model = _make_router_model()
 
-    # Sync input_model from frontend into the schema_model state
-    # This ensures forward/reverse engineering always uses the latest diagram.
+    # Sync input_model from frontend into the schema_model state.
     updates: Dict[str, Any] = {}
     if state.get("input_model"):
         updates["schema_model"] = state["input_model"]
@@ -69,43 +68,24 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
     # Reset validation retry state on every new user request.
     updates["validation_issues"] = []
     updates["retry_count"] = 0
-    updates["target_level"] = None
 
-    # For forward/reverse engineering: store the detected target level in
-    # `target_level` WITHOUT overwriting `current_level`.  current_level must
-    # stay as the level of the *source* schema so the engineering node reads
-    # the correct source.
-    #
-    # For create/edit: update current_level to what the user specified (or keep
-    # existing value if the user didn't mention a level).
     if result.detected_level and result.detected_level in (
         "conceptual", "logical", "physical"
     ):
-        if result.intent.value in (
-            UserIntent.FORWARD_ENGINEER.value,
-            UserIntent.REVERSE_ENGINEER.value,
-        ):
-            updates["target_level"] = result.detected_level
-        else:
-            updates["current_level"] = result.detected_level
+        updates["current_level"] = result.detected_level
 
-    # Compute the effective schema level the AI will generate.
-    # For create/edit: the current_level (possibly just updated above).
-    # For forward/reverse engineering: the target_level.
-    effective_level = (
-        updates.get("target_level")
-        or updates.get("current_level")
-        or state.get("current_level", "conceptual")
-    )
+    effective_level = updates.get("current_level") or state.get("current_level", "conceptual")
 
     # Emit routing info as an AIMessage so the frontend can read intent,
     # detected_level, AND effective_level through the streaming SSE.
+    # Strip whitespace from reasoning — Gemini thinking tokens can bloat this field.
+    clean_reasoning = " ".join((result.reasoning or "").split())[:300]
     routing_msg = AIMessage(
         content=json.dumps({
             "intent": result.intent.value,
             "detected_level": result.detected_level,
             "effective_level": effective_level,
-            "reasoning": result.reasoning,
+            "reasoning": clean_reasoning,
         })
     )
     updates["messages"] = [routing_msg]
@@ -119,8 +99,6 @@ def route_intent(state: AgentState) -> str:
     mapping = {
         UserIntent.CREATE.value: "schema_generator",
         UserIntent.EDIT.value: "schema_editor",
-        UserIntent.FORWARD_ENGINEER.value: "forward_engineer",
-        UserIntent.REVERSE_ENGINEER.value: "reverse_engineer",
         UserIntent.CHAT.value: "chatbot",
     }
     return mapping.get(intent, "chatbot")

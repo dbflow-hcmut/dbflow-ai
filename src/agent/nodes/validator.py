@@ -14,7 +14,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from langchain_core.messages import AIMessage
 
@@ -33,7 +33,7 @@ _LEVEL_DIR = {
 }
 
 
-def _load_json_schema(level: str, kind: str) -> Optional[dict]:
+def _load_json_schema(level: str, kind: str) -> dict | None:
     """Load a JSON Schema file for the given level and kind (model/diagram).
 
     Returns ``None`` if the schema file does not exist.
@@ -248,12 +248,12 @@ def _check_physical(data: dict, issues: List[str]) -> None:
 
 def _run_validation(
     raw_model: dict,
-    raw_diagram: Optional[dict],
+    raw_diagram: dict | None,
     level: str,
 ) -> List[str]:
-    """Synchronous validation — runs inside ``asyncio.to_thread``.
+    """Run synchronous validation inside ``asyncio.to_thread``.
 
-    This keeps all blocking I/O (file reads, ``import jsonschema``) off
+    Keep all blocking I/O (file reads, ``import jsonschema``) off
     the async event loop.
     """
     all_issues: List[str] = []

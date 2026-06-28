@@ -18,7 +18,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from dotenv import load_dotenv
 from langchain_core.documents import Document
@@ -199,14 +199,12 @@ def get_or_create_vectorstore():
         )
 
         hash_file.write_text(current_hash)
-        print(f"📚 Indexed {len(docs)} document chunks into ChromaDB.")
     else:
         vectorstore = Chroma(
             collection_name="schema_docs",
             embedding_function=embeddings,
             persist_directory=str(CHROMA_PERSIST_DIR),
         )
-        print(f"📚 Loaded existing ChromaDB index ({len(docs)} chunks, up-to-date).")
 
     return vectorstore
 
@@ -218,7 +216,7 @@ _vectorstore_lock = asyncio.Lock()
 
 
 def _get_vectorstore_sync():
-    """Synchronous helper — called inside ``asyncio.to_thread``."""
+    """Return the cached vectorstore, creating it on first call."""
     global _vectorstore
     if _vectorstore is None:
         _vectorstore = get_or_create_vectorstore()
@@ -227,11 +225,11 @@ def _get_vectorstore_sync():
 
 def _retrieve_sync(
     query: str,
-    level: Optional[str] = None,
-    doc_type: Optional[str] = None,
+    level: str | None = None,
+    doc_type: str | None = None,
     k: int = 6,
 ) -> List[Document]:
-    """Synchronous retrieval — runs inside a thread."""
+    """Retrieve relevant documents synchronously."""
     vs = _get_vectorstore_sync()
 
     # Build metadata filter
@@ -255,8 +253,8 @@ def _retrieve_sync(
 
 async def aretrieve(
     query: str,
-    level: Optional[str] = None,
-    doc_type: Optional[str] = None,
+    level: str | None = None,
+    doc_type: str | None = None,
     k: int = 6,
 ) -> List[Document]:
     """Async retrieval — wraps all blocking ChromaDB I/O in a thread.
@@ -308,7 +306,7 @@ def _retrieve_project_docs_sync(
     project_id: str,
     k: int = 4,
 ) -> List[Document]:
-    """Synchronous project-docs retrieval — runs inside a thread."""
+    """Retrieve project-specific documents synchronously."""
     vs = get_project_vectorstore()
     try:
         return vs.similarity_search(query, k=k, filter={"project_id": project_id})
@@ -340,9 +338,9 @@ def _retrieve_project_docs_with_score_sync(
     project_id: str,
     k: int = 12,
 ) -> List[tuple]:
-    """Synchronous project-docs retrieval with relevance scores — runs inside a thread.
+    """Retrieve project documents with relevance scores synchronously.
 
-    Returns List[Tuple[Document, float]] where score is cosine similarity (higher = more relevant).
+    Return List[Tuple[Document, float]] where score is cosine similarity (higher = more relevant).
     """
     vs = get_project_vectorstore()
     try:

@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Dict, List, Optional, Sequence
+from typing import Annotated, Any, Dict, List, Sequence
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph import add_messages
 from typing_extensions import TypedDict
-
-from agent.models import DiagramModel, SchemaLevel, SchemaModel, UserIntent
 
 
 class AgentState(TypedDict):
@@ -33,16 +31,16 @@ class AgentState(TypedDict):
     """
 
     messages: Annotated[Sequence[AnyMessage], add_messages]
-    schema_model: Optional[Dict[str, Any]]
-    input_model: Optional[Dict[str, Any]]
+    schema_model: Dict[str, Any] | None
+    input_model: Dict[str, Any] | None
     history: List[Dict[str, Any]]
     current_level: str  # default "conceptual" — set in graph entry
-    target_level: Optional[str]  # explicit engineering target, set by router
-    user_intent: Optional[str]
-    retrieval_context: Optional[str]
+    target_level: str | None  # explicit engineering target, set by router
+    user_intent: str | None
+    retrieval_context: str | None
     validation_issues: List[str]  # issues from last validator run (empty = passed)
     retry_count: int  # number of validator-triggered retries for this request
-    project_id: Optional[str]
-    project_docs_context: Optional[str]
-    project_docs_candidates: Optional[List[Dict[str, Any]]]  # [{page_content, metadata, score}] before reranking
-    target_dbms: Optional[str]  # "postgresql" | "mysql" | "sqlserver" | None
+    project_id: str | None
+    project_docs_context: str | None
+    project_docs_candidates: List[Dict[str, Any]] | None  # [{page_content, metadata, score}] before reranking
+    target_dbms: str | None  # "postgresql" | "mysql" | "sqlserver" | None

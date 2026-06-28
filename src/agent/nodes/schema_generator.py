@@ -15,13 +15,17 @@ import logging
 import os
 import re
 import uuid
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from agent.prompts import SCHEMA_EDITOR_PROMPT, SCHEMA_GENERATOR_PROMPT, LEVEL_INSTRUCTIONS
+from agent.prompts import (
+    LEVEL_INSTRUCTIONS,
+    SCHEMA_EDITOR_PROMPT,
+    SCHEMA_GENERATOR_PROMPT,
+)
 from agent.state import AgentState
 from agent.utils import resolve_image_urls
 
@@ -99,7 +103,6 @@ def _ensure_unique_ids(model_data: Dict[str, Any]) -> Dict[str, Any]:
         _register(cat)
 
     # --- Phase 2: rename duplicates ---------------------------------------
-    rename_map: Dict[str, str] = {}  # old_id -> new_id
     seen: Set[str] = set()
 
     for oid, objs in id_occurrences.items():
@@ -236,7 +239,7 @@ def _extract_text_before_json(text: str) -> str:
     return ""
 
 
-def _extract_model_json(text: str) -> Optional[Dict[str, Any]]:
+def _extract_model_json(text: str) -> Dict[str, Any] | None:
     """Extract model.json from fenced code blocks in LLM output.
 
     Looks for patterns like:
@@ -308,7 +311,7 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
             )
         )
 
-    model_data: Optional[Dict[str, Any]] = None
+    model_data: Dict[str, Any] | None = None
     response_text = ""
 
     for attempt in range(_MAX_RETRIES + 1):
@@ -439,7 +442,7 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
             )
         )
 
-    model_data: Optional[Dict[str, Any]] = None
+    model_data: Dict[str, Any] | None = None
     response_text = ""
 
     for attempt in range(_MAX_RETRIES + 1):

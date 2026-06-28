@@ -18,12 +18,12 @@ from langchain_core.messages import SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, StateGraph
 
-from agent.nodes.retriever import retriever_node
+from agent.models import UserIntent
 from agent.nodes.reranker import reranker_node
+from agent.nodes.retriever import retriever_node
 from agent.nodes.router import route_intent, router_node
 from agent.nodes.schema_generator import schema_editor_node, schema_generator_node
 from agent.nodes.validator import validator_node
-from agent.models import UserIntent
 from agent.state import AgentState
 from agent.utils import resolve_image_urls
 
@@ -63,6 +63,7 @@ async def chatbot_node(state: AgentState) -> Dict[str, Any]:
     project_id = state.get("project_id")
     if project_id:
         from langchain_core.messages import HumanMessage as LCHumanMessage
+
         from agent.rag import aretrieve_project_docs, format_project_docs_context
 
         last_message = ""

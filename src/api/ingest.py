@@ -15,7 +15,6 @@ import logging
 import os
 import re
 import traceback
-from typing import Optional
 
 import boto3
 from dotenv import load_dotenv
@@ -82,8 +81,8 @@ def _extract_text_sync(data: bytes, mime_type: str, file_name: str) -> str:
 
     # Raster images — Gemini Vision OCR
     if mime_type.startswith("image/"):
-        from langchain_google_genai import ChatGoogleGenerativeAI
         from langchain_core.messages import HumanMessage as LCHumanMessage
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
         b64 = base64.b64encode(data).decode("utf-8")
         data_url = f"data:{mime_type};base64,{b64}"

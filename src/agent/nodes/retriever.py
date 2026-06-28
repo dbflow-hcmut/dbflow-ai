@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from langchain_core.messages import HumanMessage
 
@@ -31,7 +31,7 @@ _DOCS_DIR = _PROJECT_ROOT / "docs"
 _RERANK_CANDIDATES_K = 12
 
 
-def _read_full_specs(level: str) -> Optional[str]:
+def _read_full_specs(level: str) -> str | None:
     """Read full model-schema.md + model.schema.json for *level*.
 
     Always returns full content — no size threshold.

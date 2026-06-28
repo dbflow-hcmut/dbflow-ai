@@ -7,10 +7,9 @@ Supports three schema levels: Conceptual, Logical, Physical.
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel, Field
-
 
 # ── Enums ────────────────────────────────────────────────────────────────────
 
@@ -62,10 +61,10 @@ class SchemaField(BaseModel):
     primary_key: bool = Field(default=False, description="Whether this is a PK")
     nullable: bool = Field(default=True, description="Whether NULL is allowed")
     unique: bool = Field(default=False, description="Whether values must be unique")
-    default: Optional[str] = Field(
+    default: str | None = Field(
         default=None, description="Default value expression"
     )
-    foreign_key: Optional[ForeignKeyRef] = Field(
+    foreign_key: ForeignKeyRef | None = Field(
         default=None, description="FK reference, if any"
     )
 
@@ -169,14 +168,14 @@ class RouterOutput(BaseModel):
     """Structured output from the Router node."""
 
     intent: UserIntent = Field(description="Detected user intent")
-    detected_level: Optional[str] = Field(
+    detected_level: str | None = Field(
         default=None,
         description=(
             "Schema level detected from the user message. "
             "One of: 'conceptual', 'logical', 'physical', or null if not mentioned."
         ),
     )
-    detected_dbms: Optional[str] = Field(
+    detected_dbms: str | None = Field(
         default=None,
         description=(
             "Target DBMS detected from the user message. "

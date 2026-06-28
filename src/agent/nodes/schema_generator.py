@@ -281,6 +281,9 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
     retrieval_context = state.get("retrieval_context") or "(No schema specification available)"
     level = state.get("current_level", "conceptual")
     level_instructions = LEVEL_INSTRUCTIONS.get(level, "")
+    target_dbms = state.get("target_dbms")
+    if level == "physical" and target_dbms:
+        level_instructions += f"\n\n**Target DBMS: {target_dbms}** — set `model.dbms` to `\"{target_dbms}\"` and use {target_dbms}-appropriate data types and index types.\n"
     prompt = SCHEMA_GENERATOR_PROMPT.format(
         retrieval_context=retrieval_context,
         current_level=level,
@@ -399,6 +402,9 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
     retrieval_context = state.get("retrieval_context") or "(No schema specification available)"
     level = state.get("current_level", "conceptual")
     level_instructions = LEVEL_INSTRUCTIONS.get(level, "")
+    target_dbms = state.get("target_dbms")
+    if level == "physical" and target_dbms:
+        level_instructions += f"\n\n**Target DBMS: {target_dbms}** — set `model.dbms` to `\"{target_dbms}\"` and use {target_dbms}-appropriate data types and index types.\n"
     prompt = SCHEMA_EDITOR_PROMPT.format(
         retrieval_context=retrieval_context,
         current_level=level,

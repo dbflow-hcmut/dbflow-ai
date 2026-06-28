@@ -185,24 +185,62 @@ def _check_logical(data: dict, issues: List[str]) -> None:
 
 
 def _check_physical(data: dict, issues: List[str]) -> None:
-    databases = data.get("databases", [])
-    if not isinstance(databases, list):
-        databases = []
-    for db in databases:
-        if not isinstance(db, dict):
+    tables = data.get("tables", [])
+    if not isinstance(tables, list):
+        tables = []
+
+    # Duplicate table names
+    names = [t.get("name", "") for t in tables if isinstance(t, dict)]
+    for name in set(n for n in names if names.count(n) > 1):
+        issues.append(f" Duplicate table name: `{name}`.")
+
+    table_ids = {t.get("id") for t in tables if isinstance(t, dict)}
+    col_index: Dict[str, set] = {}
+    for t in tables:
+        if not isinstance(t, dict):
             continue
-        for schema in db.get("schemas", []):
-            if not isinstance(schema, dict):
+        cols = t.get("columns", [])
+        if not isinstance(cols, list):
+            cols = []
+        col_index[t.get("id", "")] = {
+            c.get("id") for c in cols if isinstance(c, dict)
+        }
+
+    for table in tables:
+        if not isinstance(table, dict):
+            continue
+        columns = table.get("columns", [])
+        if not isinstance(columns, list):
+            columns = []
+        tname = table.get("name", "?")
+
+        has_pk = any(
+            c.get("roles", {}).get("primaryKey") for c in columns if isinstance(c, dict)
+        )
+        if not has_pk:
+            issues.append(f" Table `{tname}` has no primary key column.")
+
+        for col in columns:
+            if not isinstance(col, dict):
                 continue
-            tables = schema.get("tables", [])
-            if not isinstance(tables, list):
-                tables = []
-            names = [t.get("name", "") for t in tables if isinstance(t, dict)]
-            for name in set(n for n in names if names.count(n) > 1):
+            if not col.get("dataType"):
                 issues.append(
-                    f" Duplicate table name in schema "
-                    f"`{schema.get('name')}`: `{name}`."
+                    f" Column `{tname}.{col.get('name')}` has no dataType."
                 )
+            fk = col.get("roles", {}).get("foreignKey")
+            if fk and isinstance(fk, dict):
+                ref_tid = fk.get("refTableId")
+                ref_cid = fk.get("refColumnId")
+                if ref_tid and ref_tid not in table_ids:
+                    issues.append(
+                        f" FK `{tname}.{col.get('name')}` references "
+                        f"non-existent table `{ref_tid}`."
+                    )
+                elif ref_cid and ref_cid not in col_index.get(ref_tid, set()):
+                    issues.append(
+                        f" FK `{tname}.{col.get('name')}` references "
+                        f"non-existent column `{ref_cid}` in `{ref_tid}`."
+                    )
 
 
 # ── Node ─────────────────────────────────────────────────────────────────────

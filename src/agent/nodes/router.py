@@ -74,6 +74,11 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
     ):
         updates["current_level"] = result.detected_level
 
+    if result.detected_dbms and result.detected_dbms in (
+        "postgresql", "mysql", "sqlserver"
+    ):
+        updates["target_dbms"] = result.detected_dbms
+
     effective_level = updates.get("current_level") or state.get("current_level", "conceptual")
 
     # Emit routing info as an AIMessage so the frontend can read intent,
@@ -84,6 +89,7 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
         content=json.dumps({
             "intent": result.intent.value,
             "detected_level": result.detected_level,
+            "detected_dbms": result.detected_dbms,
             "effective_level": effective_level,
             "reasoning": clean_reasoning,
         })

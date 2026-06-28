@@ -31,7 +31,14 @@ Given the user's message AND the current conversation context, classify:
   Keywords: "physical", "DDL", "PostgreSQL", "MySQL", "vật lý".
 - **null**: If the user does NOT mention any level. In this case the system defaults to **conceptual**.
 
-Respond with intent, detected_level, and a brief reasoning.
+## 3. DBMS Detection — detect if the user specifies a target DBMS:
+
+- **postgresql**: Keywords: "postgresql", "postgres", "pg", "postgre".
+- **mysql**: Keywords: "mysql".
+- **sqlserver**: Keywords: "sql server", "mssql", "microsoft sql".
+- **null**: If the user does NOT mention any DBMS.
+
+Respond with intent, detected_level, detected_dbms, and a brief reasoning.
 """
 
 SCHEMA_GENERATOR_PROMPT = """\
@@ -220,6 +227,18 @@ LEVEL_INSTRUCTIONS = {
 - Table IDs use ``pid_`` prefix (e.g. ``pid_customer``, ``pid_order``).
 - Column IDs use ``pid_<table>_<column>`` pattern (e.g. ``pid_customer_email``).
 - DO NOT include ``entities``, ``relationships``, ``generalizations``, or ``categories`` — those are conceptual-level only.
+
+### DBMS-specific rules
+- If a target DBMS is specified (via ``model.dbms``), set ``model.dbms`` in output to one of: \
+  ``"postgresql"``, ``"mysql"``, ``"sqlserver"``.
+- Use DBMS-appropriate data types:
+  - **PostgreSQL**: ``integer``, ``serial``, ``bigserial``, ``text``, ``varchar``, ``boolean``, ``timestamptz``, ``uuid``, ``jsonb``
+  - **MySQL**: ``int``, ``bigint``, ``varchar``, ``text``, ``tinyint``, ``datetime``, ``json``, ``enum``
+  - **SQL Server**: ``int``, ``bigint``, ``nvarchar``, ``varchar``, ``bit``, ``datetime2``, ``uniqueidentifier``
+- Use DBMS-appropriate index types:
+  - **PostgreSQL**: BTREE, HASH, GIN, GIST, BRIN
+  - **MySQL**: BTREE, HASH
+  - **SQL Server**: CLUSTERED, NONCLUSTERED
 """,
 }
 

@@ -176,4 +176,13 @@ class RouterOutput(BaseModel):
             "One of: 'conceptual', 'logical', 'physical', or null if not mentioned."
         ),
     )
+    detected_dbms: Optional[str] = Field(
+        default=None,
+        description=(
+            "Target DBMS detected from the user message. "
+            "One of: 'postgresql', 'mysql', 'sqlserver', or null if not mentioned. "
+            "Map common aliases: 'postgres'/'pg' -> 'postgresql', "
+            "'sql server'/'mssql' -> 'sqlserver'."
+        ),
+    )
     reasoning: str = Field(description="Brief explanation of why this intent was chosen")

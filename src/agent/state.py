@@ -45,3 +45,4 @@ class AgentState(TypedDict):
     project_id: Optional[str]
     project_docs_context: Optional[str]
     project_docs_candidates: Optional[List[Dict[str, Any]]]  # [{page_content, metadata, score}] before reranking
+    target_dbms: Optional[str]  # "postgresql" | "mysql" | "sqlserver" | None

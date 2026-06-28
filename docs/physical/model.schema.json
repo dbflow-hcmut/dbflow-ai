@@ -15,6 +15,11 @@
         "id": { "type": "string", "pattern": "^pid_" },
         "name": { "type": "string", "minLength": 1 },
         "version": { "type": "integer", "minimum": 1 },
+        "dbms": {
+          "type": "string",
+          "enum": ["postgresql", "mysql", "sqlserver"],
+          "description": "Target DBMS for this physical schema."
+        },
         "notes": { "type": "string" }
       }
     },
@@ -116,7 +121,7 @@
         },
         "type": {
           "type": "string",
-          "enum": ["BTREE", "HASH", "GIN", "GIST", "BRIN"],
+          "enum": ["BTREE", "HASH", "GIN", "GIST", "BRIN", "CLUSTERED", "NONCLUSTERED"],
           "default": "BTREE"
         },
         "columns": {

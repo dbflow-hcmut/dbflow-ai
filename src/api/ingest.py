@@ -13,7 +13,6 @@ import logging
 import os
 import re
 import traceback
-from typing import Optional
 
 import boto3
 from dotenv import load_dotenv
@@ -230,7 +229,7 @@ class TextToSqlRequest(BaseModel):
     nl_query: str
     dbms: str  # "postgresql" | "mysql" | "sqlserver"
     schema_tables: list  # List of IntrospectedTable dicts from introspect endpoint
-    project_id: Optional[str] = None
+    project_id: str | None = None
 
 
 def _format_schema_context(schema_tables: list, dbms: str) -> str:

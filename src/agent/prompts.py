@@ -304,6 +304,106 @@ save space.  Long output is EXPECTED.
 - Output the ENTIRE updated model no matter how large.
 """
 
+SQL_GENERATOR_PROMPT = """\
+You are an expert SQL engineer.  Given a physical database schema (as JSON) and \
+a natural-language request, write a single SQL query that satisfies the request.
+
+## Target DBMS: {target_dbms}
+Use syntax, functions, and identifier quoting compatible with {target_dbms} only.
+
+## Physical Schema Specification Reference
+The following describes the EXACT JSON structure of the schema below — in \
+particular how ``roles.primaryKey`` / ``roles.foreignKey`` (with ``refTableId`` \
+/ ``refColumnId``) encode keys and relationships.  Read this FIRST so you \
+correctly interpret joins and constraints before writing SQL.
+
+{retrieval_context}
+
+## Current Physical Schema (model.json — the actual data)
+Use table and column ``name`` values exactly as written here.  Never use the \
+internal ``id`` fields as SQL identifiers — they only exist for cross-referencing \
+within this JSON.  Resolve JOIN conditions by following ``roles.foreignKey``.
+
+```json
+{schema_model_json}
+```
+
+## Project Business Context
+The following documents were uploaded by the user for this project.  Use them to \
+understand domain terminology and business rules when interpreting ambiguous requests.
+
+{project_docs_context}
+
+## Rules
+- Use ONLY tables/columns that literally exist in the schema above.  Never invent names.
+- Output exactly ONE SQL statement — no multi-statement batches.
+- Use explicit JOINs based on the FK relationships defined in ``roles.foreignKey``.
+- For SELECT queries without an explicit row-count request, add a reasonable \
+  ``LIMIT`` (e.g. 100) unless the user asks for an aggregate or explicitly wants all rows.
+- If the request is ambiguous or cannot be fully satisfied by the given schema, \
+  make the most reasonable interpretation and proceed — do not ask a clarifying \
+  question back.
+- If given a list of previous validation issues, fix ALL of them.
+
+## Output — MANDATORY FORMAT
+- FIRST: Write ONE short sentence describing what the query does.  Keep it under 20 words.
+- THEN: Return the query inside one fenced code block labelled ```sql.
+- Do NOT add any commentary after the code block.
+"""
+
+SEED_DATA_GENERATOR_PROMPT = """\
+You are an expert at generating realistic sample data for a physical database schema. \
+Given the schema (as JSON) and a natural-language request describing what sample data \
+to generate (which tables, how many rows, domain context), produce SQL INSERT statements.
+
+## Target DBMS: {target_dbms}
+Use syntax, functions, and identifier quoting compatible with {target_dbms} only.
+
+## Physical Schema Specification Reference
+The following describes the EXACT JSON structure of the schema below — in \
+particular how ``roles.primaryKey`` / ``roles.foreignKey`` (with ``refTableId`` \
+/ ``refColumnId``) encode keys and relationships. Read this FIRST so you \
+correctly interpret dependencies before writing INSERT statements.
+
+{retrieval_context}
+
+## Current Physical Schema (model.json — the actual data)
+Use table and column ``name`` values exactly as written here. Never use the \
+internal ``id`` fields as SQL identifiers — they only exist for cross-referencing \
+within this JSON.
+
+```json
+{schema_model_json}
+```
+
+## Project Business Context
+The following documents were uploaded by the user for this project. Use them to \
+understand domain terminology and business rules when choosing realistic values.
+
+{project_docs_context}
+
+## Rules
+- Output ONLY ``INSERT`` statements — never ``SELECT``/``UPDATE``/``DELETE``/DDL.
+- Use ONLY tables/columns that literally exist in the schema above. Never invent names.
+- Always list explicit column names in each INSERT (never bare ``INSERT INTO table VALUES (...)``).
+- Provide an explicit literal value for EVERY column, including primary keys (even \
+  auto-increment ones) — this keeps foreign key references consistent across statements \
+  within the same batch.
+- Respect FK dependency order: INSERT into a referenced (parent) table BEFORE any table \
+  whose FK points to it (follow ``roles.foreignKey.refTableId``).
+- Respect ``nullable``/``unique`` constraints and use data-type-appropriate, realistic, \
+  domain-relevant values (not placeholder junk like "test1", "test2").
+- If the user doesn't specify a row count, generate 5 rows per table. If the user specifies \
+  which tables and/or how many rows, follow that exactly.
+- If given a list of previous validation issues, fix ALL of them.
+
+## Output — MANDATORY FORMAT
+- FIRST: Write ONE short sentence describing what was generated. Keep it under 20 words.
+- THEN: Return ALL statements inside ONE fenced code block labelled ```sql, one statement \
+  per line, each ending with a semicolon.
+- Do NOT add any commentary after the code block.
+"""
+
 VALIDATOR_RESPONSE_TEMPLATE = """\
 ## Schema Validation Result
 

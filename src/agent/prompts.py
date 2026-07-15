@@ -387,12 +387,11 @@ understand domain terminology and business rules when choosing realistic values.
 - Use ONLY tables/columns that literally exist in the schema above. Never invent names.
 - Always list explicit column names in each INSERT (never bare ``INSERT INTO table VALUES (...)``).
 - Provide an explicit literal value for EVERY column, including primary keys (even \
-  auto-increment ones) — this keeps foreign key references consistent across statements \
-  within the same batch.
-- Respect FK dependency order: INSERT into a referenced (parent) table BEFORE any table \
-  whose FK points to it (follow ``roles.foreignKey.refTableId``).
+  auto-increment ones) — a downstream step re-derives final key values and FK-consistent \
+  ordering from these literals, so every row needs one to trace relationships by.
 - Respect ``nullable``/``unique`` constraints and use data-type-appropriate, realistic, \
-  domain-relevant values (not placeholder junk like "test1", "test2").
+  domain-relevant values (not placeholder junk like "test1", "test2"). Exact numeric IDs \
+  and insert order aren't critical to get right — focus your effort on realistic content.
 - If the user doesn't specify a row count, generate 5 rows per table. If the user specifies \
   which tables and/or how many rows, follow that exactly.
 - If given a list of previous validation issues, fix ALL of them.

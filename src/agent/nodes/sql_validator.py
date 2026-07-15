@@ -133,6 +133,98 @@ def _validate_statement(
     return issues
 
 
+def _fk_parent_map(schema_model: dict) -> Dict[str, Set[str]]:
+    """Return {child_table_name_lower: {parent_table_name_lower, ...}} derived
+    from each column's ``roles.foreignKey.refTableId`` (an internal table id,
+    not a name — resolved via an id->name index built here)."""
+    id_to_name: Dict[str, str] = {
+        table["id"]: table["name"].lower()
+        for table in schema_model.get("tables", []) or []
+        if isinstance(table, dict) and table.get("id") and table.get("name")
+    }
+
+    parents: Dict[str, Set[str]] = {}
+    for table in schema_model.get("tables", []) or []:
+        if not isinstance(table, dict):
+            continue
+        child_name = (table.get("name") or "").lower()
+        if not child_name:
+            continue
+        for col in table.get("columns", []) or []:
+            if not isinstance(col, dict):
+                continue
+            fk = (col.get("roles") or {}).get("foreignKey")
+            if not fk:
+                continue
+            parent_name = id_to_name.get(fk.get("refTableId"))
+            if parent_name and parent_name != child_name:
+                parents.setdefault(child_name, set()).add(parent_name)
+    return parents
+
+
+def _acyclic_tables(tables: Set[str], parents: Dict[str, Set[str]]) -> Set[str]:
+    """Kahn's algorithm restricted to ``tables`` — returns the subset that can
+    actually be linearly ordered. Tables in a genuine FK cycle (e.g. a nullable
+    `student.current_enrollment_id` pointing at `enrollment`, while `enrollment`
+    itself FKs back to `student.student_id`) can't be satisfied by reordering
+    INSERTs at all, so they must be excluded rather than flagged — otherwise
+    regeneration just bounces between the two contradictory violations forever."""
+    in_degree = {t: 0 for t in tables}
+    children: Dict[str, Set[str]] = {t: set() for t in tables}
+    for child in tables:
+        for parent in parents.get(child, set()):
+            if parent in tables and parent != child:
+                children[parent].add(child)
+    for kids in children.values():
+        for kid in kids:
+            in_degree[kid] += 1
+
+    queue = [t for t in tables if in_degree[t] == 0]
+    resolved: Set[str] = set()
+    while queue:
+        t = queue.pop()
+        resolved.add(t)
+        for kid in children[t]:
+            in_degree[kid] -= 1
+            if in_degree[kid] == 0:
+                queue.append(kid)
+    return resolved
+
+
+def _validate_insert_order(statements: List[Any], schema_model: dict, exp: Any) -> List[str]:
+    """Flag INSERTs into a child table that appear before any INSERT into a
+    table it has a foreign key to — within a single transaction this fails
+    with a FOREIGN KEY constraint error since the parent row doesn't exist yet."""
+    parents = _fk_parent_map(schema_model)
+    if not parents:
+        return []
+
+    first_index: Dict[str, int] = {}
+    for idx, stmt in enumerate(statements):
+        if not isinstance(stmt, exp.Insert):
+            continue
+        table_node = stmt.this.this if isinstance(stmt.this, exp.Schema) else stmt.this
+        if isinstance(table_node, exp.Table):
+            first_index.setdefault(table_node.name.lower(), idx)
+
+    acyclic = _acyclic_tables(set(first_index), parents)
+
+    issues: List[str] = []
+    for child, parent_names in parents.items():
+        if child not in first_index or child not in acyclic:
+            continue
+        for parent in parent_names:
+            if parent not in acyclic:
+                continue
+            if parent in first_index and first_index[parent] > first_index[child]:
+                issues.append(
+                    f" `{child}` has a foreign key referencing `{parent}`, but an "
+                    f"`INSERT INTO {child}` appears before any `INSERT INTO {parent}` — "
+                    f"move all `{parent}` inserts before the first `{child}` insert."
+                )
+    return issues
+
+
 def _validate_sql(
     sql: str,
     dialect: str,
@@ -165,6 +257,9 @@ def _validate_sql(
             _validate_statement(stmt, dialect, tables, columns_by_table, require_insert_only, exp)
         )
 
+    if require_insert_only:
+        issues.extend(_validate_insert_order(statements, schema_model, exp))
+
     return issues
 
 
@@ -180,8 +275,13 @@ async def sql_validator_node(state: AgentState) -> Dict[str, Any]:
     schema_model = state.get("schema_model") or {}
 
     if not sql:
+        # sql_generator already emitted an AI message with the raw model
+        # response when it couldn't extract SQL — don't add another one here,
+        # since the frontend surfaces only the *last* AI message and a generic
+        # "No SQL was generated" here would bury the actual raw response,
+        # which is exactly what's needed to diagnose why extraction failed.
         return {
-            "messages": [AIMessage(content="No SQL was generated to validate.")],
+            "messages": [],
             "validation_issues": [],
             "retry_count": 0,
         }

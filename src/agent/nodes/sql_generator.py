@@ -23,6 +23,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from agent.models import UserIntent
+from agent.nodes.seed_data_postprocess import postprocess_seed_sql
 from agent.prompts import SEED_DATA_GENERATOR_PROMPT, SQL_GENERATOR_PROMPT
 from agent.state import AgentState
 from agent.utils import resolve_image_urls
@@ -33,14 +34,27 @@ logger = logging.getLogger(__name__)
 # Maximum retry attempts when output has no parseable ```sql block
 _MAX_RETRIES = int(os.getenv("SCHEMA_GEN_MAX_RETRIES", "2"))
 
+# Mirrors sql_validator.py's dialect map — sqlglot needs its own dialect names.
+_DIALECT_MAP = {
+    "postgresql": "postgres",
+    "mysql": "mysql",
+    "sqlserver": "tsql",
+}
+
 
 def _make_llm(user_intent: str | None) -> ChatGoogleGenerativeAI:
     """Create a Gemini model for SQL generation — deterministic output.
 
     ``seed_data`` gets a larger token budget since it produces many INSERT
-    statements across tables, vs. ``text_to_sql``'s single statement.
+    statements across tables, vs. ``text_to_sql``'s single statement. Both
+    intents run at temperature 0: keeping PK/unique values collision-free and
+    INSERTs in FK order no longer depends on the model's own output (see
+    ``postprocess_seed_sql``, called below), so there's nothing to gain from a
+    higher temperature — only a higher risk of it breaking the required
+    ```sql fence or column-list format.
     """
-    default_tokens = "8192" if user_intent == UserIntent.SEED_DATA.value else "4096"
+    is_seed_data = user_intent == UserIntent.SEED_DATA.value
+    default_tokens = "8192" if is_seed_data else "4096"
     max_tokens = int(os.getenv("SQL_GEN_MAX_OUTPUT_TOKENS", default_tokens))
     return ChatGoogleGenerativeAI(
         model=os.getenv("API_MODEL"),
@@ -89,6 +103,17 @@ def _extract_sql(text: str) -> str | None:
     if m2:
         candidate = m2.group(1).strip()
         return candidate or None
+
+    # Fallback: an OPENING fence with no closing one — the response was cut
+    # off mid-generation (hit max_output_tokens) before the model could close
+    # the block. Recover whatever complete statements exist rather than
+    # discarding the entire (often mostly-usable) batch.
+    m3 = re.search(r"```(?:sql)?\s*\n", text, re.IGNORECASE)
+    if m3:
+        candidate = text[m3.end():].strip()
+        last_semicolon = candidate.rfind(";")
+        if last_semicolon != -1:
+            return candidate[: last_semicolon + 1]
 
     return None
 
@@ -170,9 +195,30 @@ async def sql_generator_node(state: AgentState) -> Dict[str, Any]:
         else:
             logger.warning("Still failed to extract SQL after %d retries.", _MAX_RETRIES)
 
+    cyclic_tables: set[str] = set()
+    if sql and is_seed_data:
+        # Don't rely on the LLM to keep PK/unique values distinct and INSERTs
+        # in FK dependency order — re-derive both deterministically from
+        # schema_model instead of hoping the prompt's rules were followed.
+        dialect = _DIALECT_MAP.get(target_dbms, "postgres")
+        sql, cyclic_tables = postprocess_seed_sql(sql, schema_model, dialect)
+
     if sql:
         ai_description = _extract_text_before_sql(response_text) or "Here's the SQL query for your request."
         summary = f"{ai_description}\n\n```sql\n{sql}\n```"
+        if cyclic_tables:
+            # No INSERT order can satisfy a genuine FK cycle — surface it as an
+            # explicit warning (shown to the user via the frontend's textDescription)
+            # instead of letting them hit a bare "FOREIGN KEY constraint failed" at
+            # execution time with no clue why.
+            tables_list = ", ".join(f"`{t}`" for t in sorted(cyclic_tables))
+            summary += (
+                f"\n\nCircular foreign-key dependency detected between {tables_list} — "
+                "each table has a column referencing the other, so no INSERT order can "
+                "satisfy both at once and this SQL may fail with a foreign key constraint "
+                "error. This is usually a schema-modeling mistake (e.g. a foreign key drawn "
+                "between the wrong columns) — review the relationships between these tables."
+            )
     else:
         summary = f"Could not parse a SQL query from the response. Raw response:\n\n{response_text}"
 

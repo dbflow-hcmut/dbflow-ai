@@ -17,6 +17,10 @@ from agent.utils import resolve_image_urls
 
 load_dotenv()
 
+# Intents set explicitly by the frontend via `input_intent` — never guessed
+# by the LLM classifier. Both always target the physical schema.
+_EXPLICIT_OVERRIDE_INTENTS = {UserIntent.TEXT_TO_SQL.value, UserIntent.SEED_DATA.value}
+
 
 def _make_router_model() -> ChatGoogleGenerativeAI:
     """Create a fast Gemini model wired to return ``RouterOutput``."""
@@ -43,6 +47,36 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
         updates["input_model"] = None  # clear after sync
 
     effective_schema = updates.get("schema_model") or state.get("schema_model")
+
+    # Explicit intent override from the frontend — skip LLM classification
+    # entirely. Always clear input_intent (both branches) so a stale value
+    # can't leak into a later turn on the same persisted thread.
+    override_intent = state.get("input_intent")
+    updates["input_intent"] = None
+
+    if override_intent in _EXPLICIT_OVERRIDE_INTENTS:
+        updates["user_intent"] = override_intent
+        updates["validation_issues"] = []
+        updates["retry_count"] = 0
+        updates["current_level"] = "physical"  # both overrides always target the physical model
+
+        target_dbms = None
+        if isinstance(effective_schema, dict):
+            target_dbms = (effective_schema.get("model") or {}).get("dbms")
+        if target_dbms:
+            updates["target_dbms"] = target_dbms
+
+        routing_msg = AIMessage(
+            content=json.dumps({
+                "intent": override_intent,
+                "detected_level": None,
+                "detected_dbms": target_dbms,
+                "effective_level": "physical",
+                "reasoning": f"Explicit intent override from frontend: {override_intent}.",
+            })
+        )
+        updates["messages"] = [routing_msg]
+        return updates
 
     # Build context: include info about whether a schema already exists
     context_parts: list[str] = []
@@ -106,5 +140,7 @@ def route_intent(state: AgentState) -> str:
         UserIntent.CREATE.value: "schema_generator",
         UserIntent.EDIT.value: "schema_editor",
         UserIntent.CHAT.value: "chatbot",
+        UserIntent.TEXT_TO_SQL.value: "sql_generator",
+        UserIntent.SEED_DATA.value: "sql_generator",
     }
     return mapping.get(intent, "chatbot")

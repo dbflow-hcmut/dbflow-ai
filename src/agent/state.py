@@ -28,6 +28,11 @@ class AgentState(TypedDict):
         retry_count: How many times the validator has triggered a retry for
                      the current user request. Reset to 0 by the router on
                      each new message.
+        input_intent: Explicit intent override sent by the frontend for this
+                      turn (e.g. "text_to_sql"). Consumed and cleared by
+                      router_node, which then skips LLM classification.
+        generated_sql: SQL text produced by sql_generator_node for the
+                       "text_to_sql" intent.
     """
 
     messages: Annotated[Sequence[AnyMessage], add_messages]
@@ -44,3 +49,5 @@ class AgentState(TypedDict):
     project_docs_context: str | None
     project_docs_candidates: List[Dict[str, Any]] | None  # [{page_content, metadata, score}] before reranking
     target_dbms: str | None  # "postgresql" | "mysql" | "sqlserver" | None
+    input_intent: str | None  # explicit intent override from frontend, e.g. "text_to_sql"
+    generated_sql: str | None  # SQL produced by sql_generator_node

@@ -31,7 +31,22 @@ class RelationType(str, Enum):
 
 
 class UserIntent(str, Enum):
-    """Classified intent of the user request."""
+    """Intent of the user request — drives graph routing."""
+
+    CREATE = "create"
+    EDIT = "edit"
+    CHAT = "chat"
+    TEXT_TO_SQL = "text_to_sql"
+    SEED_DATA = "seed_data"
+
+
+class ClassifiableIntent(str, Enum):
+    """Subset of ``UserIntent`` the LLM router is allowed to classify into.
+
+    ``TEXT_TO_SQL`` and ``SEED_DATA`` are deliberately excluded — they are
+    only ever set via an explicit ``input_intent`` override from the
+    frontend (see ``router_node``), never guessed by the classifier.
+    """
 
     CREATE = "create"
     EDIT = "edit"
@@ -167,7 +182,7 @@ class DiagramModel(BaseModel):
 class RouterOutput(BaseModel):
     """Structured output from the Router node."""
 
-    intent: UserIntent = Field(description="Detected user intent")
+    intent: ClassifiableIntent = Field(description="Detected user intent")
     detected_level: str | None = Field(
         default=None,
         description=(

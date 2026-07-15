@@ -2,9 +2,14 @@
 
 Graph Flow:
     START -> router -> conditional_edge:
-        "create" -> retriever -> reranker -> schema_generator -> validator -> END
-        "edit"   -> retriever -> reranker -> schema_editor    -> validator -> END
-        "chat"   -> chatbot                                               -> END
+        "create"       -> retriever -> reranker -> schema_generator -> validator     -> END
+        "edit"         -> retriever -> reranker -> schema_editor    -> validator     -> END
+        "text_to_sql"  -> retriever -> reranker -> sql_generator    -> sql_validator -> END
+        "seed_data"    -> retriever -> reranker -> sql_generator    -> sql_validator -> END
+        "chat"         -> chatbot                                                    -> END
+
+    validator/sql_validator loop back to their generating node on validation
+    failure, up to VALIDATION_MAX_RETRIES times, before falling through to END.
 """
 
 from __future__ import annotations
@@ -23,6 +28,8 @@ from agent.nodes.reranker import reranker_node
 from agent.nodes.retriever import retriever_node
 from agent.nodes.router import route_intent, router_node
 from agent.nodes.schema_generator import schema_editor_node, schema_generator_node
+from agent.nodes.sql_generator import sql_generator_node
+from agent.nodes.sql_validator import sql_validator_node
 from agent.nodes.validator import validator_node
 from agent.state import AgentState
 from agent.utils import resolve_image_urls
@@ -101,13 +108,15 @@ async def chatbot_node(state: AgentState) -> Dict[str, Any]:
 def _route_after_retriever(state: AgentState) -> str:
     """After retrieval, route to the correct generation node."""
     intent = state.get("user_intent", "create")
+    if intent in (UserIntent.TEXT_TO_SQL.value, UserIntent.SEED_DATA.value):
+        return "sql_generator"
     if intent == "edit":
         return "schema_editor"
     return "schema_generator"
 
 
 def _route_after_validator(state: AgentState) -> str:
-    """After validation, either end or retry the generating node."""
+    """After schema validation, either end or retry the generating node."""
     issues = state.get("validation_issues") or []
     retries = state.get("retry_count", 0)
 
@@ -122,6 +131,17 @@ def _route_after_validator(state: AgentState) -> str:
     return mapping.get(intent, "__end__")
 
 
+def _route_after_sql_validator(state: AgentState) -> str:
+    """After SQL validation, either end or retry sql_generator."""
+    issues = state.get("validation_issues") or []
+    retries = state.get("retry_count", 0)
+
+    if not issues or retries > _MAX_VALIDATION_RETRIES:
+        return "__end__"
+
+    return "sql_generator"
+
+
 def build_graph() -> StateGraph:
     """Construct and compile the DBFlow AI StateGraph."""
     builder = StateGraph(AgentState)
@@ -133,6 +153,8 @@ def build_graph() -> StateGraph:
     builder.add_node("schema_generator", schema_generator_node)
     builder.add_node("schema_editor", schema_editor_node)
     builder.add_node("validator", validator_node)
+    builder.add_node("sql_generator", sql_generator_node)
+    builder.add_node("sql_validator", sql_validator_node)
     builder.add_node("chatbot", chatbot_node)
 
     # Entry point
@@ -145,6 +167,7 @@ def build_graph() -> StateGraph:
         {
             "schema_generator": "retriever",
             "schema_editor": "retriever",
+            "sql_generator": "retriever",
             "chatbot": "chatbot",
         },
     )
@@ -159,6 +182,7 @@ def build_graph() -> StateGraph:
         {
             "schema_generator": "schema_generator",
             "schema_editor": "schema_editor",
+            "sql_generator": "sql_generator",
         },
     )
 
@@ -171,6 +195,17 @@ def build_graph() -> StateGraph:
         {
             "schema_generator": "schema_generator",
             "schema_editor": "schema_editor",
+            "__end__": END,
+        },
+    )
+
+    # sql_generator -> sql_validator -> conditional retry or END
+    builder.add_edge("sql_generator", "sql_validator")
+    builder.add_conditional_edges(
+        "sql_validator",
+        _route_after_sql_validator,
+        {
+            "sql_generator": "sql_generator",
             "__end__": END,
         },
     )

@@ -355,7 +355,14 @@ async def text_to_sql(body: TextToSqlRequest) -> dict:
             lines = sql.split("\n")
             sql = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
 
-        return {"sql": sql}
+        usage = getattr(response, "usage_metadata", None) or {}
+        return {
+            "sql": sql,
+            "usage": {
+                "input_tokens": int(usage.get("input_tokens", 0)),
+                "output_tokens": int(usage.get("output_tokens", 0)),
+            },
+        }
 
     except Exception as exc:
         logger.error("text-to-sql failed:\n%s", traceback.format_exc())

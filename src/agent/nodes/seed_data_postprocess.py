@@ -41,7 +41,8 @@ LiteralKey = Tuple[bool, str]
 
 
 def _index_schema(schema_model: dict) -> Tuple[Dict[str, Set[str]], Dict[Tuple[str, str], Tuple[str, str]]]:
-    """Derive from schema_model:
+    """Derive key and foreign-key column indexes from the schema model.
+
     - key_columns: {table_lower: {column_lower, ...}} — PK or unique columns.
     - fk_columns: {(child_table_lower, child_column_lower): (parent_table_lower, parent_column_lower)}
     """
@@ -112,12 +113,15 @@ def _table_parent_map(fk_columns: Dict[Tuple[str, str], Tuple[str, str]]) -> Dic
 def _topo_sort_tables(
     tables: List[str], parent_map: Dict[str, Set[str]], first_seen: Dict[str, int]
 ) -> Tuple[List[str], Set[str]]:
-    """Stable topological sort — parents before children, ties broken by each
-    table's first occurrence in the original SQL. Returns (order, cyclic) —
+    """Sort tables stably with parents before children.
+
+    Ties are broken by each table's first occurrence in the original SQL.
+    Returns (order, cyclic) —
     ``cyclic`` holds any tables that couldn't be placed at all because they sit
     on a genuine FK cycle (e.g. two tables each with a column FK-ing the
     other) — no INSERT order can satisfy that, so it's surfaced to the caller
-    as a likely schema-modeling mistake rather than silently misordered."""
+    as a likely schema-modeling mistake rather than silently misordered.
+    """
     children: Dict[str, Set[str]] = {t: set() for t in tables}
     in_degree: Dict[str, int] = {t: 0 for t in tables}
     for child in tables:
@@ -151,15 +155,18 @@ def _topo_sort_tables(
 
 
 def postprocess_seed_sql(sql: str, schema_model: dict, dialect: str) -> Tuple[str, Set[str]]:
-    """Rewrite AI-generated seed-data SQL so PK/unique values are guaranteed
-    distinct and INSERTs respect FK dependency order. Returns ``(sql, cyclic_tables)``
+    """Rewrite AI-generated seed-data SQL for valid keys and insert order.
+
+    PK/unique values are made distinct and INSERTs respect FK dependency order.
+    Returns ``(sql, cyclic_tables)``
     — ``cyclic_tables`` is non-empty when some tables sit on a genuine FK cycle
     that no insert order can satisfy (a likely schema-modeling mistake, e.g. an
     FK drawn between the wrong columns), so the caller can warn the user instead
     of leaving them to debug a bare "FOREIGN KEY constraint failed" at execution
     time. Returns the original ``sql`` unchanged (with an empty cyclic set) if
     parsing fails or there's nothing to fix — any real problem this can't handle
-    still falls through to sql_validator's checks and self-correction retry loop."""
+    still falls through to sql_validator's checks and self-correction retry loop.
+    """
     try:
         import sqlglot
         from sqlglot import exp

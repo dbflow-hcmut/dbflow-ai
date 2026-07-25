@@ -313,8 +313,9 @@ async def text_to_sql(body: TextToSqlRequest) -> dict:
     4. Return the SQL string.
     """
     try:
+        from langchain_core.messages import HumanMessage as LCHumanMessage
+        from langchain_core.messages import SystemMessage
         from langchain_google_genai import ChatGoogleGenerativeAI
-        from langchain_core.messages import SystemMessage, HumanMessage as LCHumanMessage
 
         schema_context = _format_schema_context(body.schema_tables, body.dbms)
 
@@ -322,7 +323,10 @@ async def text_to_sql(body: TextToSqlRequest) -> dict:
         project_docs_context = ""
         if body.project_id:
             try:
-                from agent.rag import aretrieve_project_docs, format_project_docs_context
+                from agent.rag import (
+                    aretrieve_project_docs,
+                    format_project_docs_context,
+                )
 
                 docs = await aretrieve_project_docs(body.nl_query, body.project_id, k=3)
                 if docs:

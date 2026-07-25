@@ -134,9 +134,11 @@ def _validate_statement(
 
 
 def _fk_parent_map(schema_model: dict) -> Dict[str, Set[str]]:
-    """Return {child_table_name_lower: {parent_table_name_lower, ...}} derived
-    from each column's ``roles.foreignKey.refTableId`` (an internal table id,
-    not a name — resolved via an id->name index built here)."""
+    """Build the parent-table map for each child table.
+
+    The map is derived from each column's ``roles.foreignKey.refTableId`` (an internal table id,
+    not a name — resolved via an id->name index built here).
+    """
     id_to_name: Dict[str, str] = {
         table["id"]: table["name"].lower()
         for table in schema_model.get("tables", []) or []
@@ -163,12 +165,14 @@ def _fk_parent_map(schema_model: dict) -> Dict[str, Set[str]]:
 
 
 def _acyclic_tables(tables: Set[str], parents: Dict[str, Set[str]]) -> Set[str]:
-    """Kahn's algorithm restricted to ``tables`` — returns the subset that can
-    actually be linearly ordered. Tables in a genuine FK cycle (e.g. a nullable
+    """Return the subset of tables that can be linearly ordered.
+
+    Uses Kahn's algorithm restricted to ``tables``. Tables in a genuine FK cycle (e.g. a nullable
     `student.current_enrollment_id` pointing at `enrollment`, while `enrollment`
     itself FKs back to `student.student_id`) can't be satisfied by reordering
     INSERTs at all, so they must be excluded rather than flagged — otherwise
-    regeneration just bounces between the two contradictory violations forever."""
+    regeneration just bounces between the two contradictory violations forever.
+    """
     in_degree = {t: 0 for t in tables}
     children: Dict[str, Set[str]] = {t: set() for t in tables}
     for child in tables:
@@ -192,9 +196,11 @@ def _acyclic_tables(tables: Set[str], parents: Dict[str, Set[str]]) -> Set[str]:
 
 
 def _validate_insert_order(statements: List[Any], schema_model: dict, exp: Any) -> List[str]:
-    """Flag INSERTs into a child table that appear before any INSERT into a
-    table it has a foreign key to — within a single transaction this fails
-    with a FOREIGN KEY constraint error since the parent row doesn't exist yet."""
+    """Flag child-table inserts that appear before parent-table inserts.
+
+    Within a single transaction this fails
+    with a FOREIGN KEY constraint error since the parent row doesn't exist yet.
+    """
     parents = _fk_parent_map(schema_model)
     if not parents:
         return []

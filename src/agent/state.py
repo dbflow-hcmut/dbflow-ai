@@ -51,3 +51,4 @@ class AgentState(TypedDict):
     target_dbms: str | None  # "postgresql" | "mysql" | "sqlserver" | None
     input_intent: str | None  # explicit intent override from frontend, e.g. "text_to_sql"
     generated_sql: str | None  # SQL produced by sql_generator_node
+    model_name: str  # resolved by backend from plan.ai_model or backend API_MODEL

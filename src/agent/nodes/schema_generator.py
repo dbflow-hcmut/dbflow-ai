@@ -208,7 +208,7 @@ def _normalize_content(content: Any) -> str:
     return str(content)
 
 
-def _make_llm() -> ChatGoogleGenerativeAI:
+def _make_llm(model_name: str) -> ChatGoogleGenerativeAI:
     """Create a Gemini model for schema generation with high output token limit.
 
     Uses SCHEMA_MAX_OUTPUT_TOKENS env var (default 131072) so operators
@@ -216,7 +216,7 @@ def _make_llm() -> ChatGoogleGenerativeAI:
     """
     max_tokens = int(os.getenv("SCHEMA_MAX_OUTPUT_TOKENS", "131072"))
     return ChatGoogleGenerativeAI(
-        model=os.getenv("API_MODEL"),
+        model=model_name,
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0.1,
         max_output_tokens=max_tokens,
@@ -279,7 +279,7 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
 
     Retries automatically if output is truncated (JSON fails to parse).
     """
-    llm = _make_llm()
+    llm = _make_llm(state["model_name"])
 
     retrieval_context = state.get("retrieval_context") or "(No schema specification available)"
     level = state.get("current_level", "conceptual")
@@ -400,7 +400,7 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
 
     Retries automatically if output is truncated (JSON fails to parse).
     """
-    llm = _make_llm()
+    llm = _make_llm(state["model_name"])
 
     retrieval_context = state.get("retrieval_context") or "(No schema specification available)"
     level = state.get("current_level", "conceptual")

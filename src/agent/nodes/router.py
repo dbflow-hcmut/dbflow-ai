@@ -22,10 +22,10 @@ load_dotenv()
 _EXPLICIT_OVERRIDE_INTENTS = {UserIntent.TEXT_TO_SQL.value, UserIntent.SEED_DATA.value}
 
 
-def _make_router_model() -> ChatGoogleGenerativeAI:
+def _make_router_model(model_name: str) -> ChatGoogleGenerativeAI:
     """Create a fast Gemini model wired to return ``RouterOutput``."""
     llm = ChatGoogleGenerativeAI(
-        model=os.getenv("API_MODEL"),
+        model=model_name,
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0,
     )
@@ -38,7 +38,7 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
     Sets ``state["user_intent"]`` so downstream conditional edges can route.
     Also syncs ``input_model`` → ``schema_model`` if the frontend provided it.
     """
-    model = _make_router_model()
+    model = _make_router_model(state["model_name"])
 
     # Sync input_model from frontend into the schema_model state.
     updates: Dict[str, Any] = {}

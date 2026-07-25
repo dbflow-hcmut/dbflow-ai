@@ -43,7 +43,9 @@ def _make_s3_client():
 
 # ── Text extraction ──────────────────────────────────────────────────────────
 
-def _extract_text_sync(data: bytes, mime_type: str, file_name: str) -> str:
+def _extract_text_sync(
+    data: bytes, mime_type: str, file_name: str, model_name: str
+) -> str:
     """Extract plain text from document bytes according to mime type.
 
     All heavy imports are done inside the function to avoid import-time
@@ -86,7 +88,7 @@ def _extract_text_sync(data: bytes, mime_type: str, file_name: str) -> str:
         data_url = f"data:{mime_type};base64,{b64}"
 
         llm = ChatGoogleGenerativeAI(
-            model=os.getenv("API_MODEL", "gemini-1.5-flash"),
+            model=model_name,
             google_api_key=os.getenv("GOOGLE_API_KEY"),
         )
         msg = LCHumanMessage(
@@ -128,6 +130,7 @@ class IngestRequest(BaseModel):
     mimeType: str
     fileName: str
     title: str
+    model_name: str
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -167,7 +170,7 @@ async def ingest_document(body: IngestRequest) -> dict:  # noqa: C901
         # ── 2. Extract text ──────────────────────────────────────────────────
         logger.info("Extracting text from %s (mime: %s)", body.fileName, body.mimeType)
         text: str = await asyncio.to_thread(
-            _extract_text_sync, raw_bytes, body.mimeType, body.fileName
+            _extract_text_sync, raw_bytes, body.mimeType, body.fileName, body.model_name
         )
         logger.info("Extracted %d chars", len(text))
 
@@ -230,6 +233,7 @@ class TextToSqlRequest(BaseModel):
     dbms: str  # "postgresql" | "mysql" | "sqlserver"
     schema_tables: list  # List of IntrospectedTable dicts from introspect endpoint
     project_id: str | None = None
+    model_name: str
 
 
 def _format_schema_context(schema_tables: list, dbms: str) -> str:
@@ -335,8 +339,9 @@ async def text_to_sql(body: TextToSqlRequest) -> dict:
             f"\n\nGenerate SQL for: {body.nl_query}"
         )
 
+        selected_model = body.model_name
         llm = ChatGoogleGenerativeAI(
-            model=os.getenv("API_MODEL", "gemini-1.5-flash"),
+            model=selected_model,
             google_api_key=os.getenv("GOOGLE_API_KEY"),
             temperature=0,
         )
@@ -361,6 +366,7 @@ async def text_to_sql(body: TextToSqlRequest) -> dict:
             "usage": {
                 "input_tokens": int(usage.get("input_tokens", 0)),
                 "output_tokens": int(usage.get("output_tokens", 0)),
+                "model_name": selected_model,
             },
         }
 

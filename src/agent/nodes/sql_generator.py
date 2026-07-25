@@ -42,7 +42,9 @@ _DIALECT_MAP = {
 }
 
 
-def _make_llm(user_intent: str | None) -> ChatGoogleGenerativeAI:
+def _make_llm(
+    user_intent: str | None, model_name: str
+) -> ChatGoogleGenerativeAI:
     """Create a Gemini model for SQL generation — deterministic output.
 
     ``seed_data`` gets a larger token budget since it produces many INSERT
@@ -57,7 +59,7 @@ def _make_llm(user_intent: str | None) -> ChatGoogleGenerativeAI:
     default_tokens = "8192" if is_seed_data else "4096"
     max_tokens = int(os.getenv("SQL_GEN_MAX_OUTPUT_TOKENS", default_tokens))
     return ChatGoogleGenerativeAI(
-        model=os.getenv("API_MODEL"),
+        model=model_name,
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0,
         max_output_tokens=max_tokens,
@@ -134,7 +136,7 @@ async def sql_generator_node(state: AgentState) -> Dict[str, Any]:
 
     user_intent = state.get("user_intent")
     is_seed_data = user_intent == UserIntent.SEED_DATA.value
-    llm = _make_llm(user_intent)
+    llm = _make_llm(user_intent, state["model_name"])
 
     retrieval_context = state.get("retrieval_context") or "(No physical schema specification available)"
     target_dbms = state.get("target_dbms") or (schema_model.get("model") or {}).get("dbms") or "postgresql"

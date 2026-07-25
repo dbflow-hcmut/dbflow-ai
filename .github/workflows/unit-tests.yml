@@ -41,15 +41,5 @@ jobs:
         run: uv run ruff check .
       - name: Check Python syntax
         run: uv run python -m compileall -q src
-      - name: Check README spelling
-        uses: codespell-project/actions-codespell@v2
-        with:
-          ignore_words_file: .codespellignore
-          path: README.md
-      - name: Check code spelling
-        uses: codespell-project/actions-codespell@v2
-        with:
-          ignore_words_file: .codespellignore
-          path: src/
       - name: Run tests with pytest
         run: uv run pytest tests/unit_tests

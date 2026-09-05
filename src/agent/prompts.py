@@ -41,28 +41,21 @@ Given the user's message AND the current conversation context, classify:
 Respond with intent, detected_level, detected_dbms, and a brief reasoning.
 """
 
+# NOTE on prompt structure (SCHEMA_GENERATOR_PROMPT, SCHEMA_EDITOR_PROMPT,
+# SQL_GENERATOR_PROMPT, SEED_DATA_GENERATOR_PROMPT): every static
+# instruction/rule block comes FIRST, and every per-request dynamic value
+# (project docs, RAG retrieval, current schema JSON, target DBMS, level)
+# is grouped into one "Context for This Request" section at the very END.
+# LLM prompt caching (Gemini implicit caching, Anthropic prompt caching,
+# etc.) matches the longest common PREFIX across calls — anything after the
+# first point of divergence can't be cached, even if it's byte-identical
+# text. Putting the huge, never-changing rule set first (instead of after
+# per-project/per-query data, as it was before) makes that whole block a
+# stable, cacheable prefix; only the small dynamic tail differs per call.
+
 SCHEMA_GENERATOR_PROMPT = """\
 You are an expert Database Architect AI.  Your job is to design a **complete,
 well-normalised** database schema from a natural-language description.
-
-## Current Schema Level: {current_level}
-
-You are generating a **{current_level}** schema.  Follow the level-specific
-rules below.
-
-## Project Business Context
-The following documents were uploaded by the user for this project.
-Use them to understand domain terminology, business rules, field names, and \
-requirements specific to this project. Prefer their language over generic assumptions.
-
-{project_docs_context}
-
-## Schema Specification Reference
-The following is the EXACT schema format you MUST follow.  \
-Your output JSON MUST conform strictly to this specification — \
-every field, every ID pattern, every enum value.
-
-{retrieval_context}
 
 ## Step 1 — Analyse Before Designing
 Before writing anything, think through:
@@ -156,8 +149,6 @@ business of this kind would need.
 - Include the parent entity/table name in attribute/column IDs to prevent collisions.
 - Use **snake_case** for ``name`` fields.
 
-{level_specific_instructions}
-
 ## Self-check before output
 Before producing the final JSON, verify:
 1. All primary keys are defined.
@@ -193,6 +184,27 @@ Let me design a schema for your e-commerce system.
 ````
 
 I've created the schema with the key tables and relationships covering the full domain.
+
+## Context for This Request
+
+**Schema Level:** {current_level} — you are generating a **{current_level}** schema. Follow the level-specific rules below.
+
+### Project Business Context
+The following documents were uploaded by the user for this project.
+Use them to understand domain terminology, business rules, field names, and \
+requirements specific to this project. Prefer their language over generic assumptions.
+
+{project_docs_context}
+
+### Schema Specification Reference
+The following is the EXACT schema format you MUST follow.  \
+Your output JSON MUST conform strictly to this specification — \
+every field, every ID pattern, every enum value.
+
+{retrieval_context}
+
+### Level-Specific Rules
+{level_specific_instructions}
 """
 
 # ── Level-specific instruction blocks inserted into SCHEMA_GENERATOR_PROMPT ──
@@ -318,22 +330,6 @@ You are an expert Database Architect AI.  You will receive:
 2. A user request to modify it.
 3. The schema specification reference.
 
-## Current Schema Level: {current_level}
-
-You are editing a **{current_level}** schema.
-
-## Project Business Context
-The following documents were uploaded by the user for this project.
-Use them to understand domain terminology, business rules, field names, and \
-requirements specific to this project. Prefer their language over generic assumptions.
-
-{project_docs_context}
-
-## Schema Specification Reference
-{retrieval_context}
-
-{level_specific_instructions}
-
 ## Step 1 — Analyse Before Editing
 Check whether the request unambiguously maps onto a change to the current \
 model.json above. If it does, proceed — use sound domain judgement to fill \
@@ -390,40 +386,31 @@ plain text and stop — do not follow the structure below.
 - Do NOT produce a diagram.json.
 - The JSON MUST be **complete and syntactically valid** — never truncate it.
 - Output the ENTIRE updated model no matter how large.
+
+## Context for This Request
+
+**Schema Level:** {current_level} — you are editing a **{current_level}** schema.
+
+### Project Business Context
+The following documents were uploaded by the user for this project.
+Use them to understand domain terminology, business rules, field names, and \
+requirements specific to this project. Prefer their language over generic assumptions.
+
+{project_docs_context}
+
+### Schema Specification Reference
+{retrieval_context}
+
+### Level-Specific Rules
+{level_specific_instructions}
 """
 
 SQL_GENERATOR_PROMPT = """\
 You are an expert SQL engineer.  Given a physical database schema (as JSON) and \
 a natural-language request, write a single SQL query that satisfies the request.
 
-## Target DBMS: {target_dbms}
-Use syntax, functions, and identifier quoting compatible with {target_dbms} only.
-
-## Physical Schema Specification Reference
-The following describes the EXACT JSON structure of the schema below — in \
-particular how ``roles.primaryKey`` / ``roles.foreignKey`` (with ``refTableId`` \
-/ ``refColumnId``) encode keys and relationships.  Read this FIRST so you \
-correctly interpret joins and constraints before writing SQL.
-
-{retrieval_context}
-
-## Current Physical Schema (model.json — the actual data)
-Use table and column ``name`` values exactly as written here.  Never use the \
-internal ``id`` fields as SQL identifiers — they only exist for cross-referencing \
-within this JSON.  Resolve JOIN conditions by following ``roles.foreignKey``.
-
-```json
-{schema_model_json}
-```
-
-## Project Business Context
-The following documents were uploaded by the user for this project.  Use them to \
-understand domain terminology and business rules when interpreting ambiguous requests.
-
-{project_docs_context}
-
 ## Rules
-- Use ONLY tables/columns that literally exist in the schema above.  Never invent names.
+- Use ONLY tables/columns that literally exist in the schema below.  Never invent names.
 - Output exactly ONE SQL statement — no multi-statement batches.
 - Use explicit JOINs based on the FK relationships defined in ``roles.foreignKey``.
 - For SELECT queries without an explicit row-count request, add a reasonable \
@@ -437,6 +424,34 @@ understand domain terminology and business rules when interpreting ambiguous req
 - FIRST: Write ONE short sentence describing what the query does.  Keep it under 20 words.
 - THEN: Return the query inside one fenced code block labelled ```sql.
 - Do NOT add any commentary after the code block.
+
+## Context for This Request
+
+**Target DBMS:** {target_dbms} — use syntax, functions, and identifier quoting \
+compatible with {target_dbms} only.
+
+### Physical Schema Specification Reference
+The following describes the EXACT JSON structure of the schema below — in \
+particular how ``roles.primaryKey`` / ``roles.foreignKey`` (with ``refTableId`` \
+/ ``refColumnId``) encode keys and relationships.  Read this FIRST so you \
+correctly interpret joins and constraints before writing SQL.
+
+{retrieval_context}
+
+### Current Physical Schema (model.json — the actual data)
+Use table and column ``name`` values exactly as written here.  Never use the \
+internal ``id`` fields as SQL identifiers — they only exist for cross-referencing \
+within this JSON.  Resolve JOIN conditions by following ``roles.foreignKey``.
+
+```json
+{schema_model_json}
+```
+
+### Project Business Context
+The following documents were uploaded by the user for this project.  Use them to \
+understand domain terminology and business rules when interpreting ambiguous requests.
+
+{project_docs_context}
 """
 
 SEED_DATA_GENERATOR_PROMPT = """\
@@ -444,35 +459,9 @@ You are an expert at generating realistic sample data for a physical database sc
 Given the schema (as JSON) and a natural-language request describing what sample data \
 to generate (which tables, how many rows, domain context), produce SQL INSERT statements.
 
-## Target DBMS: {target_dbms}
-Use syntax, functions, and identifier quoting compatible with {target_dbms} only.
-
-## Physical Schema Specification Reference
-The following describes the EXACT JSON structure of the schema below — in \
-particular how ``roles.primaryKey`` / ``roles.foreignKey`` (with ``refTableId`` \
-/ ``refColumnId``) encode keys and relationships. Read this FIRST so you \
-correctly interpret dependencies before writing INSERT statements.
-
-{retrieval_context}
-
-## Current Physical Schema (model.json — the actual data)
-Use table and column ``name`` values exactly as written here. Never use the \
-internal ``id`` fields as SQL identifiers — they only exist for cross-referencing \
-within this JSON.
-
-```json
-{schema_model_json}
-```
-
-## Project Business Context
-The following documents were uploaded by the user for this project. Use them to \
-understand domain terminology and business rules when choosing realistic values.
-
-{project_docs_context}
-
 ## Rules
 - Output ONLY ``INSERT`` statements — never ``SELECT``/``UPDATE``/``DELETE``/DDL.
-- Use ONLY tables/columns that literally exist in the schema above. Never invent names.
+- Use ONLY tables/columns that literally exist in the schema below. Never invent names.
 - Always list explicit column names in each INSERT (never bare ``INSERT INTO table VALUES (...)``).
 - Provide an explicit literal value for EVERY column, including primary keys (even \
   auto-increment ones) — a downstream step re-derives final key values and FK-consistent \
@@ -489,6 +478,34 @@ understand domain terminology and business rules when choosing realistic values.
 - THEN: Return ALL statements inside ONE fenced code block labelled ```sql, one statement \
   per line, each ending with a semicolon.
 - Do NOT add any commentary after the code block.
+
+## Context for This Request
+
+**Target DBMS:** {target_dbms} — use syntax, functions, and identifier quoting \
+compatible with {target_dbms} only.
+
+### Physical Schema Specification Reference
+The following describes the EXACT JSON structure of the schema below — in \
+particular how ``roles.primaryKey`` / ``roles.foreignKey`` (with ``refTableId`` \
+/ ``refColumnId``) encode keys and relationships. Read this FIRST so you \
+correctly interpret dependencies before writing INSERT statements.
+
+{retrieval_context}
+
+### Current Physical Schema (model.json — the actual data)
+Use table and column ``name`` values exactly as written here. Never use the \
+internal ``id`` fields as SQL identifiers — they only exist for cross-referencing \
+within this JSON.
+
+```json
+{schema_model_json}
+```
+
+### Project Business Context
+The following documents were uploaded by the user for this project. Use them to \
+understand domain terminology and business rules when choosing realistic values.
+
+{project_docs_context}
 """
 
 VALIDATOR_RESPONSE_TEMPLATE = """\
@@ -498,4 +515,3 @@ VALIDATOR_RESPONSE_TEMPLATE = """\
 
 {details}
 """
-

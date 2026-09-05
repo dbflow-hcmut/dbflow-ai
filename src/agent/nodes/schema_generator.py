@@ -27,7 +27,7 @@ from agent.prompts import (
     SCHEMA_GENERATOR_PROMPT,
 )
 from agent.state import AgentState
-from agent.utils import resolve_image_urls
+from agent.utils import resolve_image_urls, strip_routing_messages
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -294,7 +294,7 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
         project_docs_context=state.get("project_docs_context") or "",
     )
 
-    messages = [SystemMessage(content=prompt), *state["messages"]]
+    messages = [SystemMessage(content=prompt), *strip_routing_messages(state["messages"])]
     messages = await resolve_image_urls(messages)
 
     # If this is a validation retry, prepend the issues so the LLM self-corrects.
@@ -313,10 +313,18 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
 
     model_data: Dict[str, Any] | None = None
     response_text = ""
+    is_clarifying_question = False
 
     for attempt in range(_MAX_RETRIES + 1):
         response = await llm.ainvoke(messages)
         response_text = _normalize_content(response.content)
+
+        if "```" not in response_text:
+            # The LLM asked a clarifying question instead of generating —
+            # nothing to parse or retry, just relay it as-is.
+            is_clarifying_question = True
+            break
+
         model_data = _extract_model_json(response_text)
 
         if model_data is not None:
@@ -329,7 +337,7 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
             )
             messages = [
                 SystemMessage(content=prompt),
-                *state["messages"],
+                *strip_routing_messages(state["messages"]),
                 AIMessage(content=response_text),
                 HumanMessage(
                     content=(
@@ -346,6 +354,9 @@ async def schema_generator_node(state: AgentState) -> Dict[str, Any]:
                 "Still failed to parse model JSON after %d retries.",
                 _MAX_RETRIES,
             )
+
+    if is_clarifying_question:
+        return {"messages": [AIMessage(content=response_text)], "skip_validation": True}
 
     # Deduplicate IDs to prevent collisions from LLM output
     if model_data:
@@ -424,7 +435,7 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
         SystemMessage(
             content=f"Current model.json:\n```json\n{current_model_json}\n```"
         ),
-        *state["messages"],
+        *strip_routing_messages(state["messages"]),
     ]
     messages = await resolve_image_urls(messages)
 
@@ -444,10 +455,18 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
 
     model_data: Dict[str, Any] | None = None
     response_text = ""
+    is_clarifying_question = False
 
     for attempt in range(_MAX_RETRIES + 1):
         response = await llm.ainvoke(messages)
         response_text = _normalize_content(response.content)
+
+        if "```" not in response_text:
+            # The LLM asked a clarifying question instead of generating —
+            # nothing to parse or retry, just relay it as-is.
+            is_clarifying_question = True
+            break
+
         model_data = _extract_model_json(response_text)
 
         if model_data is not None:
@@ -463,7 +482,7 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
                 SystemMessage(
                     content=f"Current model.json:\n```json\n{current_model_json}\n```"
                 ),
-                *state["messages"],
+                *strip_routing_messages(state["messages"]),
                 AIMessage(content=response_text),
                 HumanMessage(
                     content=(
@@ -479,6 +498,9 @@ async def schema_editor_node(state: AgentState) -> Dict[str, Any]:
                 "Editor: still failed to parse model JSON after %d retries.",
                 _MAX_RETRIES,
             )
+
+    if is_clarifying_question:
+        return {"messages": [AIMessage(content=response_text)], "skip_validation": True}
 
     # Deduplicate IDs to prevent collisions from LLM output
     if model_data:

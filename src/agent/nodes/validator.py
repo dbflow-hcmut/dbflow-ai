@@ -282,6 +282,16 @@ async def validator_node(state: AgentState) -> Dict[str, Any]:
     Returns ``validation_issues`` in state so the graph can route back to
     the generating node for a self-correction retry when issues are found.
     """
+    if state.get("skip_validation"):
+        # The generating node asked a clarifying question instead of
+        # producing a schema this turn — nothing to validate, and the
+        # question itself was already emitted as the outgoing message.
+        return {
+            "skip_validation": False,
+            "validation_issues": [],
+            "retry_count": 0,
+        }
+
     raw_model = state.get("schema_model")
     level = state.get("current_level", "conceptual")
 

@@ -32,7 +32,7 @@ from agent.nodes.sql_generator import sql_generator_node
 from agent.nodes.sql_validator import sql_validator_node
 from agent.nodes.validator import validator_node
 from agent.state import AgentState
-from agent.utils import resolve_image_urls
+from agent.utils import resolve_image_urls, strip_routing_messages
 
 load_dotenv()
 
@@ -96,7 +96,10 @@ async def chatbot_node(state: AgentState) -> Dict[str, Any]:
                 f"Use it to answer questions about the project.\n\n{project_docs_context}"
             )
 
-    messages = [SystemMessage(content="\n".join(context_parts)), *state["messages"]]
+    messages = [
+        SystemMessage(content="\n".join(context_parts)),
+        *strip_routing_messages(state["messages"]),
+    ]
     messages = await resolve_image_urls(messages)
     response = await llm.ainvoke(messages)
     return {"messages": [response]}

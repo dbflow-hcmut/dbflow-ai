@@ -28,6 +28,10 @@ def _make_router_model(model_name: str) -> ChatGoogleGenerativeAI:
         model=model_name,
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0,
+        # A classification response is at most a few hundred tokens — cap it
+        # so a decoding glitch (e.g. Gemini degenerating into a repeated-token
+        # loop) can't run away to tens of thousands of tokens before failing.
+        max_output_tokens=1024,
     )
     return llm.with_structured_output(RouterOutput)
 

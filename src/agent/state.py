@@ -33,6 +33,10 @@ class AgentState(TypedDict):
                       router_node, which then skips LLM classification.
         generated_sql: SQL text produced by sql_generator_node for the
                        "text_to_sql" intent.
+        skip_validation: Set by schema_generator/schema_editor when the LLM
+                          asked a clarifying question instead of generating
+                          a schema (no JSON produced). Consumed once by
+                          validator_node, which then resets it to False.
     """
 
     messages: Annotated[Sequence[AnyMessage], add_messages]
@@ -52,3 +56,4 @@ class AgentState(TypedDict):
     input_intent: str | None  # explicit intent override from frontend, e.g. "text_to_sql"
     generated_sql: str | None  # SQL produced by sql_generator_node
     model_name: str  # resolved by backend from plan.ai_model or backend API_MODEL
+    skip_validation: bool  # set when the LLM asked a clarifying question instead of generating

@@ -26,7 +26,7 @@ from agent.models import UserIntent
 from agent.nodes.seed_data_postprocess import postprocess_seed_sql
 from agent.prompts import SEED_DATA_GENERATOR_PROMPT, SQL_GENERATOR_PROMPT
 from agent.state import AgentState
-from agent.utils import resolve_image_urls
+from agent.utils import resolve_image_urls, strip_routing_messages
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -150,7 +150,7 @@ async def sql_generator_node(state: AgentState) -> Dict[str, Any]:
         project_docs_context=state.get("project_docs_context") or "",
     )
 
-    messages = [SystemMessage(content=prompt), *state["messages"]]
+    messages = [SystemMessage(content=prompt), *strip_routing_messages(state["messages"])]
     messages = await resolve_image_urls(messages)
 
     # If this is a validation retry, prepend the issues so the LLM self-corrects.
@@ -184,7 +184,7 @@ async def sql_generator_node(state: AgentState) -> Dict[str, Any]:
             )
             messages = [
                 SystemMessage(content=prompt),
-                *state["messages"],
+                *strip_routing_messages(state["messages"]),
                 AIMessage(content=response_text),
                 HumanMessage(
                     content=(

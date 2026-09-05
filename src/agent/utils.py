@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import logging
 import math
 from typing import Any, List
 
 import httpx
 from docx import Document
-from langchain_core.messages import AnyMessage, HumanMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 
 from agent.models import (
     DiagramEdge,
@@ -23,6 +24,36 @@ from agent.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_routing_message(message: AnyMessage) -> bool:
+    """Return True if *message* is router_node's routing-info AIMessage."""
+    if not isinstance(message, AIMessage) or not isinstance(message.content, str):
+        return False
+    try:
+        data = json.loads(message.content)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return isinstance(data, dict) and "intent" in data
+
+
+def strip_routing_messages(messages: List[AnyMessage]) -> List[AnyMessage]:
+    """Drop every routing-info ``AIMessage`` router_node has ever appended.
+
+    ``router_node`` appends one of these after every turn so the frontend
+    can read intent/level over the SSE stream — but they must never be
+    replayed back into a downstream LLM call. Each one sits directly after
+    a real AIMessage with no HumanMessage in between, and when converting
+    our message list into its own API format Gemini merges consecutive
+    same-role turns together. Left in history across enough turns, the
+    model starts imitating that merged "JSON immediately followed by text"
+    shape in its own new replies. Filtering them out everywhere (not just
+    the trailing one from this turn) also guarantees the list still ends
+    on the latest HumanMessage, since routing messages are the only thing
+    router_node ever inserts between a user turn and a generation node.
+    """
+    return [m for m in messages if not _is_routing_message(m)]
+
 
 # ── Async image pre-fetch ────────────────────────────────────────────────────
 

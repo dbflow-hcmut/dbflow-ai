@@ -22,6 +22,21 @@ load_dotenv()
 _EXPLICIT_OVERRIDE_INTENTS = {UserIntent.TEXT_TO_SQL.value, UserIntent.SEED_DATA.value}
 
 
+def _clean_suggested_title(value: str, max_length: int = 80) -> str:
+    """Normalize the model-generated conversation title for UI persistence."""
+    title = " ".join((value or "").split()).strip(" \t\r\n\"'“”‘’")
+    for prefix in ("ai:", "chat:"):
+        if title.lower().startswith(prefix):
+            title = title[len(prefix):].lstrip()
+            break
+    title = title.rstrip(" .,!?:;…-")
+    if len(title) <= max_length:
+        return title
+
+    shortened = title[: max_length + 1].rsplit(" ", 1)[0].rstrip()
+    return shortened or title[:max_length].rstrip()
+
+
 def _make_router_model(model_name: str) -> ChatGoogleGenerativeAI:
     """Create a fast Gemini model wired to return ``RouterOutput``."""
     llm = ChatGoogleGenerativeAI(
@@ -123,6 +138,7 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
     # detected_level, AND effective_level through the streaming SSE.
     # Strip whitespace from reasoning — Gemini thinking tokens can bloat this field.
     clean_reasoning = " ".join((result.reasoning or "").split())[:300]
+    suggested_title = _clean_suggested_title(result.suggested_title)
     routing_msg = AIMessage(
         content=json.dumps({
             "intent": result.intent.value,
@@ -130,6 +146,7 @@ async def router_node(state: AgentState) -> Dict[str, Any]:
             "detected_dbms": result.detected_dbms,
             "effective_level": effective_level,
             "reasoning": clean_reasoning,
+            "suggested_title": suggested_title,
         })
     )
     updates["messages"] = [routing_msg]

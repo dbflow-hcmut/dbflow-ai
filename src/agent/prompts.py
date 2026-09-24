@@ -38,7 +38,15 @@ Given the user's message AND the current conversation context, classify:
 - **sqlserver**: Keywords: "sql server", "mssql", "microsoft sql".
 - **null**: If the user does NOT mention any DBMS.
 
-Respond with intent, detected_level, detected_dbms, and a brief reasoning.
+## 4. Suggested Conversation Title
+
+Create a concise title that summarizes the latest user request:
+- Use 3-7 words and the same language as the user.
+- Capture the subject or task, not the wording of the request.
+- Return plain text without quotes, trailing punctuation, or prefixes such as "AI:" or "Chat:".
+- Do not use generic titles such as "New Chat", "Conversation", or "Database Request".
+
+Respond with intent, detected_level, detected_dbms, a brief reasoning, and suggested_title.
 """
 
 # NOTE on prompt structure (SCHEMA_GENERATOR_PROMPT, SCHEMA_EDITOR_PROMPT,

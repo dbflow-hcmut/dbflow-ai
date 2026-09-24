@@ -199,4 +199,13 @@ class RouterOutput(BaseModel):
             "'sql server'/'mssql' -> 'sqlserver'."
         ),
     )
-    reasoning: str = Field(description="Brief explanation of why this intent was chosen")
+    reasoning: str = Field(
+        default="", description="Brief explanation of why this intent was chosen"
+    )
+    suggested_title: str = Field(
+        default="",
+        description=(
+            "A concise 3-7 word title summarizing the latest user request, "
+            "written in the same language as the user"
+        ),
+    )

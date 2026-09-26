@@ -45,6 +45,11 @@ Create a concise title that summarizes the latest user request:
 - Capture the subject or task, not the wording of the request.
 - Return plain text without quotes, trailing punctuation, or prefixes such as "AI:" or "Chat:".
 - Do not use generic titles such as "New Chat", "Conversation", or "Database Request".
+- If the latest user message is only a confirmation or short reply (e.g. "ok", "oke", "yes", "đồng ý",
+  "tạo đi", "làm đi"), do NOT use it as the title. Look back at the conversation and title the
+  schema/task being confirmed (e.g. the database the assistant just proposed to create).
+- If the conversation moves to a new schema/domain, the title must describe that new one,
+  not an earlier one.
 
 Respond with intent, detected_level, detected_dbms, a brief reasoning, and suggested_title.
 """

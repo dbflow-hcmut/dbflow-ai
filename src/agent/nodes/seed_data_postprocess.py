@@ -9,12 +9,10 @@ so this module re-derives them in code after generation instead of hoping the
 model's own text obeys the prompt's rules:
 
 1. Walks tables in foreign-key dependency order (parents before children) and,
-   for each row, either (a) copies a foreign-key column's value from whatever
-   its referenced parent row was just reassigned to, or (b) if the column is
-   its own table's primary key/unique column (and not also an FK — covers the
-   shared PK/FK "sub-type" pattern, e.g. `student.student_id` referencing
-   `users.id`), assigns it a fresh guaranteed-unique value (sequential ints
-   for numeric columns, deduped-with-suffix for text columns).
+   for each row, either (a) copies a foreign-key value or composite tuple from
+   whatever its referenced parent row was just reassigned to, or (b) assigns
+   standalone unique keys and the local portion of a primary key fresh values
+   (sequential ints for numeric columns, deduped-with-suffix for text columns).
 2. Reorders the INSERT statements themselves to match that same dependency
    order, so a referenced (parent) table's rows always precede any table
    whose FK points to it — regardless of what order the LLM wrote them in.
@@ -32,21 +30,44 @@ import heapq
 import logging
 import random
 import uuid
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, NamedTuple, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
 # (is_string, literal value) — cheap hashable identity for a sqlglot Literal.
 LiteralKey = Tuple[bool, str]
+KeyGroup = Tuple[str, ...]
 
 
-def _index_schema(schema_model: dict) -> Tuple[Dict[str, Set[str]], Dict[Tuple[str, str], Tuple[str, str]]]:
-    """Derive key and foreign-key column indexes from the schema model.
+class ForeignKeyGroup(NamedTuple):
+    """One single- or multi-column FK, ordered by the parent key columns."""
 
-    - key_columns: {table_lower: {column_lower, ...}} — PK or unique columns.
-    - fk_columns: {(child_table_lower, child_column_lower): (parent_table_lower, parent_column_lower)}
+    source_columns: KeyGroup
+    parent_table: str
+    parent_columns: KeyGroup
+
+
+def _index_schema(
+    schema_model: dict,
+) -> Tuple[
+    Dict[str, KeyGroup],
+    Dict[str, List[KeyGroup]],
+    Dict[str, Set[str]],
+    Dict[str, List[ForeignKeyGroup]],
+]:
+    """Index primary/unique keys and infer composite FK groups.
+
+    Physical model metadata lives on individual columns. Several columns that
+    reference every distinct column of the same parent composite key represent
+    one composite FK. Repeated references to one target column remain separate
+    single-column FKs (for example ``created_by`` and ``updated_by``).
     """
     id_to_column: Dict[str, Tuple[str, str]] = {}
+    primary_keys: Dict[str, KeyGroup] = {}
+    key_groups: Dict[str, List[KeyGroup]] = {}
+    single_unique_columns: Dict[str, Set[str]] = {}
+    raw_foreign_keys: Dict[str, List[Tuple[str, str, str]]] = {}
+
     for table in schema_model.get("tables", []) or []:
         if not isinstance(table, dict):
             continue
@@ -57,14 +78,13 @@ def _index_schema(schema_model: dict) -> Tuple[Dict[str, Set[str]], Dict[Tuple[s
             if isinstance(col, dict) and col.get("id") and col.get("name"):
                 id_to_column[col["id"]] = (tname, col["name"].lower())
 
-    key_columns: Dict[str, Set[str]] = {}
-    fk_columns: Dict[Tuple[str, str], Tuple[str, str]] = {}
     for table in schema_model.get("tables", []) or []:
         if not isinstance(table, dict):
             continue
         tname = (table.get("name") or "").lower()
         if not tname:
             continue
+        primary_key: List[str] = []
         for col in table.get("columns", []) or []:
             if not isinstance(col, dict):
                 continue
@@ -72,41 +92,123 @@ def _index_schema(schema_model: dict) -> Tuple[Dict[str, Set[str]], Dict[Tuple[s
             if not cname:
                 continue
             roles = col.get("roles") or {}
-            if roles.get("primaryKey") or col.get("unique"):
-                key_columns.setdefault(tname, set()).add(cname)
+            if roles.get("primaryKey"):
+                primary_key.append(cname)
+            if col.get("unique"):
+                single_unique_columns.setdefault(tname, set()).add(cname)
             fk = roles.get("foreignKey")
             if fk:
                 parent = id_to_column.get(fk.get("refColumnId"))
                 if parent:
-                    fk_columns[(tname, cname)] = parent
+                    parent_table, parent_column = parent
+                    raw_foreign_keys.setdefault(tname, []).append(
+                        (cname, parent_table, parent_column)
+                    )
 
-        # Uniqueness can also come from a standalone index (`isUnique: true`)
-        # instead of the column's own `unique` flag — e.g. `categories.name`
-        # enforced via `CREATE UNIQUE INDEX ... ON categories (name)` rather
-        # than an inline column constraint. Only single-column unique indexes
-        # are treated as a key column here: for a composite one (e.g.
-        # `unique(user_id, product_id)`), forcing each column independently
-        # unique would be wrong — it'd break legitimate repeats of one column
-        # across different rows, which is exactly what a composite constraint
-        # is meant to still allow.
+        if primary_key:
+            primary_keys[tname] = tuple(primary_key)
+            key_groups.setdefault(tname, []).append(tuple(primary_key))
+
         for idx in table.get("indexes", []) or []:
             if not isinstance(idx, dict) or not idx.get("isUnique"):
                 continue
             idx_columns = idx.get("columns", []) or []
-            if len(idx_columns) != 1:
+            column_names = tuple(
+                (item.get("columnName") or "").lower()
+                for item in idx_columns
+                if isinstance(item, dict) and item.get("columnName")
+            )
+            if not column_names:
                 continue
-            col_name = (idx_columns[0].get("columnName") or "").lower()
-            if col_name:
-                key_columns.setdefault(tname, set()).add(col_name)
+            if column_names not in key_groups.setdefault(tname, []):
+                key_groups[tname].append(column_names)
+            if len(column_names) == 1:
+                single_unique_columns.setdefault(tname, set()).add(
+                    column_names[0]
+                )
 
-    return key_columns, fk_columns
+        for column_name in single_unique_columns.get(tname, set()):
+            group = (column_name,)
+            if group not in key_groups.setdefault(tname, []):
+                key_groups[tname].append(group)
+
+    foreign_key_groups: Dict[str, List[ForeignKeyGroup]] = {}
+    for child_table, references in raw_foreign_keys.items():
+        references_by_parent: Dict[str, List[Tuple[str, str]]] = {}
+        for source_column, parent_table, parent_column in references:
+            references_by_parent.setdefault(parent_table, []).append(
+                (source_column, parent_column)
+            )
+
+        for parent_table, parent_references in references_by_parent.items():
+            candidate_groups: List[List[Tuple[str, str]]] = []
+            for reference in parent_references:
+                _source_column, parent_column = reference
+                candidate = next(
+                    (
+                        group
+                        for group in candidate_groups
+                        if all(item[1] != parent_column for item in group)
+                    ),
+                    None,
+                )
+                if candidate is None:
+                    candidate_groups.append([reference])
+                else:
+                    candidate.append(reference)
+
+            for candidate in candidate_groups:
+                referenced_columns = {item[1] for item in candidate}
+                matching_parent_key = next(
+                    (
+                        group
+                        for group in key_groups.get(parent_table, [])
+                        if len(group) > 1
+                        and len(group) == len(candidate)
+                        and set(group) == referenced_columns
+                    ),
+                    None,
+                )
+                if matching_parent_key:
+                    source_by_parent = {
+                        parent_column: source_column
+                        for source_column, parent_column in candidate
+                    }
+                    foreign_key_groups.setdefault(child_table, []).append(
+                        ForeignKeyGroup(
+                            tuple(
+                                source_by_parent[column]
+                                for column in matching_parent_key
+                            ),
+                            parent_table,
+                            matching_parent_key,
+                        )
+                    )
+                    continue
+
+                for source_column, parent_column in candidate:
+                    foreign_key_groups.setdefault(child_table, []).append(
+                        ForeignKeyGroup(
+                            (source_column,), parent_table, (parent_column,)
+                        )
+                    )
+
+    return (
+        primary_keys,
+        key_groups,
+        single_unique_columns,
+        foreign_key_groups,
+    )
 
 
-def _table_parent_map(fk_columns: Dict[Tuple[str, str], Tuple[str, str]]) -> Dict[str, Set[str]]:
+def _table_parent_map(
+    foreign_key_groups: Dict[str, List[ForeignKeyGroup]],
+) -> Dict[str, Set[str]]:
     parents: Dict[str, Set[str]] = {}
-    for (child_table, _child_col), (parent_table, _parent_col) in fk_columns.items():
-        if parent_table != child_table:
-            parents.setdefault(child_table, set()).add(parent_table)
+    for child_table, groups in foreign_key_groups.items():
+        for group in groups:
+            if group.parent_table != child_table:
+                parents.setdefault(child_table, set()).add(group.parent_table)
     return parents
 
 
@@ -181,7 +283,12 @@ def postprocess_seed_sql(sql: str, schema_model: dict, dialect: str) -> Tuple[st
     if not any(isinstance(s, exp.Insert) for s in statements):
         return sql, set()
 
-    key_columns, fk_columns = _index_schema(schema_model)
+    (
+        primary_keys,
+        key_groups,
+        single_unique_columns,
+        foreign_key_groups,
+    ) = _index_schema(schema_model)
 
     parsed: List[Dict[str, Any]] = []
     for idx, stmt in enumerate(statements):
@@ -206,16 +313,21 @@ def postprocess_seed_sql(sql: str, schema_model: dict, dialect: str) -> Tuple[st
             first_seen[p["table"]] = p["idx"]
             tables_present.append(p["table"])
 
-    table_order, cyclic_tables = _topo_sort_tables(tables_present, _table_parent_map(fk_columns), first_seen)
+    table_order, cyclic_tables = _topo_sort_tables(
+        tables_present, _table_parent_map(foreign_key_groups), first_seen
+    )
 
     # --- Reassign values, walking tables in parent-first order so a child's
     # FK columns can always find their parent's already-decided new value. ---
     random_base = random.randint(100_000, 999_999)
     counters: Dict[Tuple[str, str], int] = {}
     seen_text: Dict[Tuple[str, str], Set[str]] = {}
-    # (table, column) -> {old_literal_key: new_literal_key} — read by child
-    # tables' FK columns to propagate a parent's reassigned value.
-    remap: Dict[Tuple[str, str], Dict[LiteralKey, LiteralKey]] = {}
+    # (table, ordered key columns) -> {old tuple: new tuple}. Composite keys
+    # must be mapped as tuples: mapping each component independently loses the
+    # association when a component value repeats in several parent rows.
+    key_remaps: Dict[
+        Tuple[str, KeyGroup], Dict[Tuple[LiteralKey, ...], Tuple[LiteralKey, ...]]
+    ] = {}
 
     rows_by_table: Dict[str, List[Dict[str, Any]]] = {}
     for p in parsed:
@@ -223,54 +335,101 @@ def postprocess_seed_sql(sql: str, schema_model: dict, dialect: str) -> Tuple[st
             rows_by_table.setdefault(p["table"], []).append(p)
 
     for table in table_order:
+        table_fk_groups = foreign_key_groups.get(table, [])
+        foreign_key_columns = {
+            column
+            for group in table_fk_groups
+            for column in group.source_columns
+        }
+        columns_to_regenerate = set(single_unique_columns.get(table, set()))
+        local_primary_key_columns = [
+            column
+            for column in primary_keys.get(table, ())
+            if column not in foreign_key_columns
+        ]
+        if local_primary_key_columns:
+            # One fresh local component is sufficient to make a composite PK
+            # tuple fresh. Regenerating every component would incorrectly
+            # impose per-column uniqueness on a composite key.
+            columns_to_regenerate.add(local_primary_key_columns[0])
+        columns_to_regenerate.difference_update(foreign_key_columns)
+
         for p in rows_by_table.get(table, []):
             cols = p["columns"]
             for row in p["rows"]:
                 if not isinstance(row, exp.Tuple):
                     continue
-                for col_idx, col_name in enumerate(cols):
-                    if col_idx >= len(row.expressions):
-                        continue
-                    lit = row.expressions[col_idx]
-                    if not isinstance(lit, exp.Literal):
-                        continue
-                    old_key: LiteralKey = (lit.is_string, lit.this)
+                expressions = {
+                    column: row.expressions[index]
+                    for index, column in enumerate(cols)
+                    if index < len(row.expressions)
+                    and isinstance(row.expressions[index], exp.Literal)
+                }
+                original_values: Dict[str, LiteralKey] = {
+                    column: (literal.is_string, literal.this)
+                    for column, literal in expressions.items()
+                }
 
-                    parent = fk_columns.get((table, col_name))
-                    if parent is not None:
-                        new_key = remap.get(parent, {}).get(old_key)
-                        if new_key is None:
-                            continue  # references a row outside this batch — leave as-is
-                        is_string, new_val = new_key
-                        lit.set("this", new_val)
-                        lit.set("is_string", is_string)
-                        if table in key_columns and col_name in key_columns[table]:
-                            remap.setdefault((table, col_name), {})[old_key] = new_key
+                # Propagate parent key changes one FK tuple at a time.
+                for group in table_fk_groups:
+                    if not all(
+                        column in original_values
+                        for column in group.source_columns
+                    ):
                         continue
+                    old_tuple = tuple(
+                        original_values[column]
+                        for column in group.source_columns
+                    )
+                    new_tuple = key_remaps.get(
+                        (group.parent_table, group.parent_columns), {}
+                    ).get(old_tuple)
+                    if new_tuple is None:
+                        continue  # likely references a pre-existing parent row
+                    for column, new_value in zip(
+                        group.source_columns, new_tuple
+                    ):
+                        literal = expressions[column]
+                        literal.set("is_string", new_value[0])
+                        literal.set("this", new_value[1])
 
-                    if table in key_columns and col_name in key_columns[table]:
-                        key = (table, col_name)
-                        if not lit.is_string:
-                            n = counters.get(key, random_base)
-                            counters[key] = n + 1
-                            new_key = (False, str(n))
-                        else:
-                            # Always append a random suffix — never just when a
-                            # duplicate is seen within this batch. This module
-                            # has no visibility into rows already sitting in the
-                            # sandbox from earlier runs, and small-vocabulary
-                            # text columns (surnames, common category names,
-                            # etc.) collide with that pre-existing data far more
-                            # often than with anything else in the same batch.
-                            bucket = seen_text.setdefault(key, set())
-                            candidate = f"{lit.this}-{uuid.uuid4().hex[:6]}"
-                            while candidate in bucket:
-                                candidate = f"{lit.this}-{uuid.uuid4().hex[:6]}"
-                            bucket.add(candidate)
-                            new_key = (True, candidate)
-                        remap.setdefault(key, {})[old_key] = new_key
-                        lit.set("this", new_key[1])
-                        lit.set("is_string", new_key[0])
+                # Regenerate standalone unique keys and only the non-FK parts
+                # of a PK. For a composite PK this deliberately permits one
+                # component to repeat; uniqueness belongs to the whole tuple.
+                for column in columns_to_regenerate:
+                    literal = expressions.get(column)
+                    if literal is None:
+                        continue
+                    counter_key = (table, column)
+                    if not literal.is_string:
+                        n = counters.get(counter_key, random_base)
+                        counters[counter_key] = n + 1
+                        new_value = (False, str(n))
+                    else:
+                        bucket = seen_text.setdefault(counter_key, set())
+                        candidate = f"{literal.this}-{uuid.uuid4().hex[:6]}"
+                        while candidate in bucket:
+                            candidate = f"{literal.this}-{uuid.uuid4().hex[:6]}"
+                        bucket.add(candidate)
+                        new_value = (True, candidate)
+                    literal.set("is_string", new_value[0])
+                    literal.set("this", new_value[1])
+
+                # Publish tuple mappings after FK propagation and local-key
+                # generation so dependent tables receive the final values.
+                for key_group in key_groups.get(table, []):
+                    if not all(column in original_values for column in key_group):
+                        continue
+                    old_tuple = tuple(
+                        original_values[column] for column in key_group
+                    )
+                    new_tuple = tuple(
+                        (expressions[column].is_string, expressions[column].this)
+                        for column in key_group
+                    )
+                    key_remaps.setdefault((table, key_group), {})[
+                        old_tuple
+                    ] = new_tuple
 
     # --- Reorder statements to match the same parent-first table order. ---
     order_rank = {t: i for i, t in enumerate(table_order)}

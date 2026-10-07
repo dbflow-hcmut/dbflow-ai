@@ -1,13 +1,13 @@
 ## model (Thông tin mô hình)
 
-- `id*`: ID mô hình (pattern: `^cid_`).
+- `id*`: ID mô hình không rỗng; giữ nguyên UUID/ID đã lưu. ID mới nên dùng `cid_`.
 - `name*`: Tên mô hình.
 - `version*`: Phiên bản (integer ≥ 1).
 - `notes`: Ghi chú.
 
 ## entity (Thực thể)
 
-- `id*`: ID thực thể (pattern: `^cid_`).
+- `id*`: ID thực thể (chuỗi không rỗng; ID mới nên dùng `cid_`).
 - `name*`: Tên thực thể.
 - `kind`: Loại thực thể (`strong`, `weak`). Mặc định: `strong`.
 - `attributes*`: Tập các thuộc tính của thực thể — mỗi phần tử là **object** (xem `attribute`).
@@ -15,21 +15,21 @@
 
 ## attribute (Thuộc tính)
 
-- `id*`: ID thuộc tính (pattern: `^cid_`).
+- `id*`: ID thuộc tính (chuỗi không rỗng; ID mới nên dùng `cid_`).
 - `name*`: Tên thuộc tính.
 - `kind*`: Loại thuộc tính (`simple`, `composite`, `multi_valued`, `complex`, `derived`).
 - `isKey*`: Có phải thuộc tính khóa hay không (boolean).
 - `semantics`: Tag ngữ nghĩa mô tả ý nghĩa nghiệp vụ.
 - `components`: Tập các thuộc tính con nếu `kind = composite | complex`.
-  - `id*`: ID thuộc tính con (pattern: `^cid_`).
+  - `id*`: ID thuộc tính con (chuỗi không rỗng; ID mới nên dùng `cid_`).
   - `name*`: Tên thuộc tính con.
-  - `kind*`: Luôn là `simple`.
+  - Cùng cấu trúc `attribute`, gồm `id`, `name`, `kind`, `isKey`; có thể lồng thêm `components`.
 - `derivation`: Công thức tính nếu `kind = derived`.
 - `notes`: Ghi chú nghiệp vụ.
 
 ## relationship (Quan hệ)
 
-- `id*`: ID quan hệ (pattern: `^cid_`).
+- `id*`: ID quan hệ (chuỗi không rỗng; ID mới nên dùng `cid_`).
 - `name*`: Tên quan hệ.
 - `type*`: Loại quan hệ (`association`, `identifying`).
 - `arity`: Bậc quan hệ (integer ≥ 1).
@@ -40,7 +40,7 @@
 
 ## relEnd (Đầu mút quan hệ)
 
-- `entityId*`: ID của thực thể tham gia (pattern: `^cid_`).
+- `entityId*`: ID của thực thể tham gia (chuỗi không rỗng; ID mới nên dùng `cid_`).
 - `role`: Vai trò của thực thể trong quan hệ (**CHỈ dùng cho quan hệ đệ quy** — khi cả hai đầu mút cùng entityId).
 - `cardinality`: Ký hiệu lượng số (`"1"`, `"N"`, `"M"`, `"1..N"`, v.v.).
 - `optional`: Bắt buộc (`false`) / Tùy chọn (`true`).
@@ -69,9 +69,9 @@ Mỗi đầu mút **BẮT BUỘC** phải có trường `role` khác nhau để 
 
 ## generalization (Tổng quát hóa)
 
-- `id*`: ID (pattern: `^cid_`).
-- `parentEntityId*`: ID của thực thể cha (pattern: `^cid_`).
-- `childEntityIds*`: Tập các ID của thực thể con.
+- `id*`: ID (chuỗi không rỗng; ID mới nên dùng `cid_`).
+- `parentEntityIds*`: Mảng ID của các thực thể cha (ít nhất 1), hỗ trợ nhiều cha.
+- `childEntityIds*`: Mảng ID của thực thể con; có thể rỗng khi đang chỉnh canvas.
 - `categoryBy`: Tiêu chí phân loại thực thể.
 - `constraints*`: Các ràng buộc cha-con.
   - `disjointness*`: `disjoint` hoặc `overlap`.
@@ -79,8 +79,17 @@ Mỗi đầu mút **BẮT BUỘC** phải có trường `role` khác nhau để 
 
 ## category (Thể loại / Union)
 
-- `id*`: ID (pattern: `^cid_`).
-- `categoryEntityId*`: ID của category entity (pattern: `^cid_`).
-- `superclassEntityIds*`: Tập các ID của superclass entities (≥ 2).
+- `id*`: ID (chuỗi không rỗng; ID mới nên dùng `cid_`).
+- `categoryEntityId`: ID của category entity (chuỗi không rỗng; ID mới nên dùng `cid_`).
+- `superclassEntityIds*`: Tập các ID của superclass entities; có thể rỗng khi đang chỉnh canvas.
 - `completeness*`: `total` hoặc `partial`.
 - `notes`: Ghi chú.
+
+## Payload rules
+
+- Required root fields: `model`, `entities`, `relationships`. Optional root fields: `generalizations`, `categories`, `constraints` (array), `notes`, `tags`.
+- New ISA output uses `parentEntityIds`. Older payloads may use singular `parentEntityId`; at least one of these fields must exist.
+- Include `kind` on every new entity and `kind`/`isKey` on every new attribute, recursively through `components`. Legacy component attributes may omit `isKey`.
+- Optional relationship-end `notes` are accepted for older payloads.
+- Empty models and partially connected ISA/category definitions are valid storage states. Complete generated designs still need valid keys and references.
+- Preserve existing IDs and metadata unless the requested edit changes them.

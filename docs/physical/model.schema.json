@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2019-09/schema",
-  "$id": "https://example.com/physical/physical.schema.json",
+  "$id": "https://example.com/physical/model.schema.json",
   "title": "Physical Relational Schema",
   "description": "Physical relational schema with concrete data types, indexes, and FK constraints.",
   "type": "object",
@@ -12,21 +12,21 @@
       "additionalProperties": false,
       "required": ["id", "name", "version"],
       "properties": {
-        "id": { "type": "string", "pattern": "^pid_" },
-        "name": { "type": "string", "minLength": 1 },
-        "version": { "type": "integer", "minimum": 1 },
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 1},
         "dbms": {
           "type": "string",
           "enum": ["postgresql", "mysql", "sqlserver"],
           "description": "Target DBMS for this physical schema."
         },
-        "notes": { "type": "string" }
+        "notes": {"type": "string"},
+        "description": {"type": "string"}
       }
     },
     "tables": {
       "type": "array",
-      "minItems": 1,
-      "items": { "$ref": "#/$defs/table" }
+      "items": {"$ref": "#/$defs/table"}
     }
   },
   "$defs": {
@@ -35,58 +35,50 @@
       "additionalProperties": false,
       "required": ["id", "name", "columns"],
       "properties": {
-        "id": { "type": "string", "pattern": "^pid_" },
-        "name": { "type": "string", "minLength": 1 },
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
         "columns": {
           "type": "array",
-          "minItems": 1,
-          "items": { "$ref": "#/$defs/column" }
+          "items": {"$ref": "#/$defs/column"}
         },
         "indexes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/index" }
+          "items": {"$ref": "#/$defs/index"}
         },
-        "notes": { "type": "string" }
+        "notes": {"type": "string"},
+        "functionalDependencies": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/functionalDependency"}
+        },
+        "showFunctionalDependencies": {"type": "boolean", "default": false},
+        "comment": {"type": "string"}
       }
     },
     "column": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "dataType"],
+      "required": ["id", "name"],
       "properties": {
-        "id": { "type": "string", "pattern": "^pid_" },
-        "name": { "type": "string", "minLength": 1 },
-        "dataType": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Base SQL type without length, e.g. 'varchar', 'integer', 'decimal'."
-        },
-        "length": {
-          "type": "string",
-          "description": "Length or precision, e.g. '255' for varchar(255), '10,2' for decimal(10,2)."
-        },
-        "nullable": { "type": "boolean", "default": true },
-        "unique": { "type": "boolean", "default": false },
-        "autoIncrement": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether this column auto-increments (e.g. SERIAL, AUTO_INCREMENT, IDENTITY)."
-        },
-        "defaultValue": {
-          "type": "string",
-          "description": "SQL default value expression, e.g. 'NOW()', '0', 'true'."
-        },
-        "roles": { "$ref": "#/$defs/roles" },
-        "notes": { "type": "string" }
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "dataType": {"type": "string", "description": "Base SQL type without length, e.g. 'varchar', 'integer', 'decimal'."},
+        "length": {"type": "string", "description": "Length or precision, e.g. '255' for varchar(255), '10,2' for decimal(10,2)."},
+        "nullable": {"type": "boolean", "default": true},
+        "unique": {"type": "boolean", "default": false},
+        "autoIncrement": {"type": "boolean", "default": false, "description": "Whether this column auto-increments (e.g. SERIAL, AUTO_INCREMENT, IDENTITY)."},
+        "defaultValue": {"type": "string", "description": "SQL default value expression, e.g. 'NOW()', '0', 'true'."},
+        "roles": {"$ref": "#/$defs/roles"},
+        "notes": {"type": "string"},
+        "comment": {"type": "string"}
       }
     },
     "roles": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "primaryKey": { "type": "boolean" },
-        "foreignKey": { "$ref": "#/$defs/foreignKey" },
-        "candidateKey": { "type": "boolean" }
+        "primaryKey": {"type": "boolean"},
+        "foreignKey": {"$ref": "#/$defs/foreignKey"},
+        "candidateKey": {"type": "boolean"}
       }
     },
     "foreignKey": {
@@ -94,8 +86,8 @@
       "additionalProperties": false,
       "required": ["refTableId", "refColumnId"],
       "properties": {
-        "refTableId": { "type": "string", "pattern": "^pid_" },
-        "refColumnId": { "type": "string", "pattern": "^pid_" },
+        "refTableId": {"type": "string", "minLength": 1},
+        "refColumnId": {"type": "string", "minLength": 1},
         "onDelete": {
           "type": "string",
           "enum": ["NO ACTION", "CASCADE", "SET NULL", "SET DEFAULT", "RESTRICT"],
@@ -113,12 +105,8 @@
       "additionalProperties": false,
       "required": ["id", "name", "type", "columns"],
       "properties": {
-        "id": { "type": "string" },
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Index name, e.g. 'idx_customer_email'."
-        },
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1, "description": "Index name, e.g. 'idx_customer_email'."},
         "type": {
           "type": "string",
           "enum": ["BTREE", "HASH", "GIN", "GIST", "BRIN", "CLUSTERED", "NONCLUSTERED"],
@@ -131,16 +119,35 @@
             "type": "object",
             "required": ["columnName", "order"],
             "properties": {
-              "columnName": { "type": "string", "minLength": 1 },
+              "columnName": {"type": "string", "minLength": 1},
               "order": {
                 "type": "string",
                 "enum": ["ASC", "DESC"],
                 "default": "ASC"
               }
-            }
+            },
+            "additionalProperties": false
           }
         },
-        "isUnique": { "type": "boolean", "default": false }
+        "isUnique": {"type": "boolean", "default": false}
+      }
+    },
+    "functionalDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "description": "Stable FD identifier; include in new output. Older payloads may omit it."},
+        "name": {"type": "string"},
+        "left": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "right": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "notes": {"type": "string"}
       }
     }
   }

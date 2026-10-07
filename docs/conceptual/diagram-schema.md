@@ -1,9 +1,9 @@
 ## CRITICAL: Node ID Convention
 
-The frontend renders the diagram by mapping stored node IDs to React node IDs as follows:
-- Entity node: React id = `entityId` (falls back to `id` if missing).
-- Relationship node: React id = `relationshipId` (falls back to `id`).
-- Attribute node: React id = `attributeId` (falls back to `id`).
+Node IDs identify the model elements represented in the diagram:
+- Entity node: node id = `entityId` (falls back to `id` if missing).
+- Relationship node: node id = `relationshipId` (falls back to `id`).
+- Attribute node: node id = `attributeId` (falls back to `id`).
 
 **Therefore, for each node the `id` field MUST be the same value as its linked model ID:**
 - Entity node: `id` = `entityId` = the entity's id from model.json.
@@ -41,8 +41,8 @@ The diagram MUST contain nodes and edges for ALL elements defined in model.json:
 
 ## diagram (Sơ đồ tổng thể)
 
-* `id*`: ID sơ đồ (pattern: `^cid_`).
-* `name*`: Tên sơ đồ.
+* `id`: ID sơ đồ (chuỗi không rỗng).
+* `name`: Tên sơ đồ.
 * `viewport`: Cấu hình khung nhìn.
   * `x, y`: Tọa độ offset.
   * `zoom`: Mức phóng to/thu nhỏ.
@@ -55,8 +55,8 @@ The diagram MUST contain nodes and edges for ALL elements defined in model.json:
 
 ## node
 
-* `id*`: ID node (pattern: `^cid_`). MUST equal `entityId`/`relationshipId`/`attributeId` (see convention above).
-* `type*`: Loại node (`entity`, `relationship`, `attribute`, `isaCircle`, `unionCircle`, `note`).
+* `id*`: ID node (chuỗi không rỗng). MUST equal `entityId`/`relationshipId`/`attributeId` (see convention above).
+* `type*`: Loại node (`entity`, `relationship`, `attribute`, `isaCircle`, `unionCircle`, `note`, `sticky-note`, `text-label`, `drawing-path`).
 * `position*`: Vị trí node trên canvas (`x`, `y`).
 * `size*`: Kích thước node (`w`, `h`). Minimum: 20×20. Recommended: entity 120×60, relationship 110×50, attribute 90×40.
 * `zIndex`: Thứ tự lớp vẽ.
@@ -71,17 +71,17 @@ The diagram MUST contain nodes and edges for ALL elements defined in model.json:
 
 ### entity node
 
-* `entityId*`: MUST equal node `id`. Tham chiếu đến `model.entities[].id` (pattern: `^cid_`).
+* `entityId*`: MUST equal node `id`. Tham chiếu đến `model.entities[].id` (chuỗi không rỗng).
 * `entityRender.doubleStroke`: `true` nếu là weak entity (hình chữ nhật viền đôi).
 
 ### relationship node
 
-* `relationshipId*`: MUST equal node `id`. Tham chiếu đến `model.relationships[].id` (pattern: `^cid_`).
+* `relationshipId*`: MUST equal node `id`. Tham chiếu đến `model.relationships[].id` (chuỗi không rỗng).
 * `relationshipRender.doubleStroke`: `true` nếu là identifying relationship (hình thoi viền đôi).
 
 ### attribute node
 
-* `attributeId*`: MUST equal node `id`. Tham chiếu đến attribute id trong model (pattern: `^cid_`).
+* `attributeId*`: MUST equal node `id`. Tham chiếu đến attribute id trong model (chuỗi không rỗng).
 * `attributeRender`: Các ký hiệu hiển thị cho oval.
   * `doubleEllipse`: Oval kép (multi-valued hoặc complex parent).
   * `dashed`: Oval nét đứt (derived).
@@ -105,24 +105,24 @@ The diagram MUST contain nodes and edges for ALL elements defined in model.json:
 
 ## edge (Cạnh nối)
 
-* `id*`: ID cạnh (pattern: `^cid_`).
+* `id*`: ID cạnh (chuỗi không rỗng).
 * `type*`: Loại cạnh:
   * `participation`: entity ↔ relationship (normal).
   * `attrOf`: attribute ↔ entity/relationship (connects attribute to its owner).
   * `componentOf`: attribute con ↔ attribute composite/complex.
   * `identifying`: entity ↔ relationship (identifying, bracket line style).
   * `isaParent`: entity cha ↔ isaCircle.
-  * `isaChild`: isaCircle ↔ entity con.
+  * `isaChild`: isaCircle ↔ entity con, hoặc direct entity ↔ entity generalization có bracket.
   * `categoryLink`: categoryEntity ↔ unionCircle.
   * `categoryMember`: unionCircle ↔ superclass entity.
 * `relationshipId`: Tham chiếu model.relationships (nếu type = `participation` hoặc `identifying`).
-* `generalizationId`: Tham chiếu model.generalizations (nếu type = `isaParent` / `isaChild`).
-* `categoryId`: Tham chiếu model.categories (nếu type = `categoryLink` / `categoryMember`).
+* `generalizationId`: Tham chiếu model.generalizations (bắt buộc nếu type = `isaParent` / `isaChild`). Với d/o circle, edge không có bracket là parent, edge có bracket là child. Entity → entity edge luôn được lưu như direct identifying/bracket generalization edge; `generalizationId` bằng chính `id` của edge; đầu mút có bracket là parent entity, đầu còn lại là child entity. Mặc định bracket ở `from`, nên `from.nodeId` là parent entity và `to.nodeId` là child entity nếu người dùng không đổi direction.
+* `categoryId`: Tham chiếu model.categories (bắt buộc nếu type = `categoryLink` / `categoryMember`). Với u circle, edge không có bracket là superclass, edge có bracket là category entity.
 * `from*`: Đầu mút nguồn.
-  * `nodeId*`: ID node nguồn = entityId/relationshipId/attributeId (pattern: `^cid_`).
+  * `nodeId*`: ID node nguồn = entityId/relationshipId/attributeId (chuỗi không rỗng).
   * `portId`: Cổng kết nối (`top`, `bottom`, `left`, `right`).
 * `to*`: Đầu mút đích.
-  * `nodeId*`: ID node đích = entityId/relationshipId/attributeId (pattern: `^cid_`).
+  * `nodeId*`: ID node đích = entityId/relationshipId/attributeId (chuỗi không rỗng).
   * `portId`: Cổng kết nối (`top`, `bottom`, `left`, `right`).
 * `labels`: Văn bản hiển thị trên cạnh.
   * `nearFrom`: Nhãn gần đầu mút nguồn (thường là cardinality).
@@ -136,3 +136,14 @@ The diagram MUST contain nodes and edges for ALL elements defined in model.json:
   * `to.marker`: `none` / `one` / `many`.
   * `to.bracket`: `true` = bracket line (identifying relationship).
 
+## Storage envelope
+
+```json
+{ "diagram": { "nodes": [], "edges": [] } }
+```
+
+- `nodes` and `edges` are required arrays; `id` and `name` on `diagram` are optional.
+- IDs and references are non-empty strings; UUIDs and generated edge/column-handle IDs are accepted.
+- Annotation types include `sticky-note`, `text-label`, and `drawing-path`, with an optional `data` object.
+- Model data describes entities/tables and their semantics; diagram data describes layout, rendering, edges, and annotations.
+- `style.meta` stores entity/relationship/attribute rendering hints. Inline `fields`/`columns` are accepted in older payloads. Direct `isaChild` edges may connect two entities; bracket ends identify the parent.

@@ -12,10 +12,10 @@ The AI must produce output that conforms **exactly** to this specification.
 }
 ```
 
-- `model.id`: identifier for the schema (prefix `lid_`).
+- `model.id`: non-empty identifier for the schema; preserve existing IDs, including UUIDs.
 - `model.name`: human-readable name.
 - `model.version`: integer, start at `1`.
-- `tables`: array of table objects (at least 1).
+- `tables`: array of table objects; may be empty for an empty canvas.
 
 ---
 
@@ -23,10 +23,11 @@ The AI must produce output that conforms **exactly** to this specification.
 
 | Field                    | Type     | Required | Description                              |
 |--------------------------|----------|----------|------------------------------------------|
-| `id`                     | string   | ✅       | Unique ID, prefix `lid_` (e.g. `lid_student`). |
+| `id`                     | string   | ✅       | Non-empty ID; new IDs use `lid_` (e.g. `lid_student`). |
 | `name`                   | string   | ✅       | Table name in **snake_case**.            |
-| `columns`                | array    | ✅       | At least 1 column.                       |
+| `columns`                | array    | ✅       | Ordered columns; may be empty while editing.                       |
 | `functionalDependencies` | array    |          | Optional FD list.                        |
+| `showFunctionalDependencies` | boolean |       | Persisted FD visibility (default `false`). |
 | `notes`                  | string   |          | Optional notes.                          |
 
 ---
@@ -35,11 +36,10 @@ The AI must produce output that conforms **exactly** to this specification.
 
 | Field      | Type    | Required | Description                                        |
 |------------|---------|----------|----------------------------------------------------|
-| `id`       | string  | ✅       | Unique ID, prefix `lid_` (e.g. `lid_student_name`).|
+| `id`       | string  | ✅       | Non-empty ID; new IDs use `lid_` (e.g. `lid_student_name`).|
 | `name`     | string  | ✅       | Column name in **snake_case**.                     |
-| `type`     | string  |          | Optional logical data type hint (e.g. `VARCHAR`, `INTEGER`). Not DBMS-specific. |
-| `nullable` | boolean |          | Allow NULL (default `true`).                       |
-| `unique`   | boolean |          | UNIQUE constraint (default `false`).               |
+| `nullable` | boolean | ✅       | Allow NULL (default `true`).                       |
+| `unique`   | boolean | ✅       | UNIQUE constraint (default `false`).               |
 | `roles`    | object  |          | Key roles (see below).                             |
 | `notes`    | string  |          | Optional notes.                                    |
 
@@ -55,8 +55,8 @@ The AI must produce output that conforms **exactly** to this specification.
 
 | Field        | Type   | Description                                         |
 |--------------|--------|-----------------------------------------------------|
-| `refTableId` | string | ID of the referenced table (prefix `lid_`).         |
-| `refColumnId`| string | ID of the referenced column (prefix `lid_`).        |
+| `refTableId` | string | Exact existing table ID.         |
+| `refColumnId`| string | Exact existing column ID.        |
 
 ---
 
@@ -64,21 +64,21 @@ The AI must produce output that conforms **exactly** to this specification.
 
 | Field   | Type   | Required | Description                            |
 |---------|--------|----------|----------------------------------------|
-| `id`    | string |          | Unique ID, prefix `lid_`.              |
+| `id`    | string | ✅       | Stable, non-empty ID.              |
 | `name`  | string |          | Optional descriptive name.             |
-| `left`  | array  | ✅       | Determinant column IDs (prefix `lid_`).|
-| `right` | array  | ✅       | Dependent column IDs (prefix `lid_`).  |
+| `left`  | array  | ✅       | Determinant column IDs or names.|
+| `right` | array  | ✅       | Dependent column IDs or names.  |
 | `notes` | string |          | Optional notes.                        |
 
 ---
 
 ## ID Naming Conventions (CRITICAL)
 
-All IDs **MUST** start with `lid_` (logical ID prefix).
+All persisted IDs and references are non-empty strings. Preserve existing IDs (including UUIDs); use `lid_` for newly generated IDs.
 
 - Table IDs: `lid_{table_name}` (e.g. `lid_student`, `lid_course`).
 - Column IDs: `lid_{table_name}_{column_name}` (e.g. `lid_student_name`, `lid_course_id`).
-  - **Every column ID MUST include the table name** to guarantee global uniqueness.
+  - **Every newly generated column ID MUST include the table name** to guarantee global uniqueness.
 - FD IDs: `lid_fd_{table_name}_{fd_name}` (e.g. `lid_fd_student_email_determines_name`).
 
 ---
@@ -190,3 +190,11 @@ All IDs **MUST** start with `lid_` (logical ID prefix).
 }
 ```
 
+## Output rules
+
+- New logical columns have no data type. The optional `type` field is a legacy hint accepted only for older payloads.
+- Include `nullable` and `unique` on every new column and `id` on every new FD. Older payloads may omit these fields.
+- FD sides may be empty in a partially edited model. Empty table/column arrays are also valid storage states.
+- A complete generated design still needs a PK on every table and valid FK references.
+- Preserve existing IDs, FD arrays, `showFunctionalDependencies`, and notes unless the requested edit changes them.
+- Emit only fields defined in the accompanying `model.schema.json`.

@@ -5,82 +5,85 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["diagram"],
-
   "properties": {
     "diagram": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "nodes", "edges"],
+      "required": ["nodes", "edges"],
       "properties": {
-        "id": { "type": "string", "pattern": "^lid_" },
-        "name": { "type": "string" },
-
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
         "viewport": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "x": { "type": "number" },
-            "y": { "type": "number" },
-            "zoom": { "type": "number", "minimum": 0.1, "maximum": 5.0 },
-            "gridSize": { "type": "integer", "minimum": 2 },
-            "snapToGrid": { "type": "boolean" }
+            "x": {"type": "number"},
+            "y": {"type": "number"},
+            "zoom": {"type": "number", "minimum": 0.1, "maximum": 5.0},
+            "gridSize": {"type": "integer", "minimum": 2},
+            "snapToGrid": {"type": "boolean"}
           }
         },
-
-        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
-        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
+        "nodes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/node"}
+        },
+        "edges": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/edge"}
+        }
       }
     }
   },
-
   "$defs": {
     "point": {
       "type": "object",
       "additionalProperties": false,
       "required": ["x", "y"],
-      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+      "properties": {
+        "x": {"type": "number"},
+        "y": {"type": "number"}
+      }
     },
-
     "size": {
       "type": "object",
       "additionalProperties": false,
       "required": ["w", "h"],
       "properties": {
-        "w": { "type": "number", "minimum": 20 },
-        "h": { "type": "number", "minimum": 20 }
+        "w": {"type": "number", "minimum": 20},
+        "h": {"type": "number", "minimum": 20}
       }
     },
-
     "style": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "class": { "type": "string" },
-        "stroke": { "type": ["string", "null"] },
-        "fill": { "type": ["string", "null"] },
-        "fontSize": { "type": "number" }
+        "class": {"type": "string"},
+        "stroke": {
+          "type": ["string", "null"]
+        },
+        "fill": {
+          "type": ["string", "null"]
+        },
+        "fontSize": {"type": "number"}
       }
     },
-
     "node": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "type", "position", "size"],
       "properties": {
-        "id": { "type": "string", "pattern": "^lid_" },
-        "type": { "type": "string", "enum": ["table", "note"] },
-        "position": { "$ref": "#/$defs/point" },
-        "size": { "$ref": "#/$defs/size" },
-        "zIndex": { "type": "integer", "minimum": 0 },
-        "style": { "$ref": "#/$defs/style" },
-
-        "name": { "type": "string" },
-
-        "tableId": {
+        "id": {"type": "string", "minLength": 1},
+        "type": {
           "type": "string",
-          "pattern": "^lid_"
+          "enum": ["table", "note", "sticky-note", "text-label", "drawing-path"]
         },
-
+        "position": {"$ref": "#/$defs/point"},
+        "size": {"$ref": "#/$defs/size"},
+        "zIndex": {"type": "integer", "minimum": 0},
+        "style": {"$ref": "#/$defs/style"},
+        "name": {"type": "string"},
+        "tableId": {"type": "string", "minLength": 1},
         "columns": {
           "type": "array",
           "items": {
@@ -88,79 +91,90 @@
             "additionalProperties": false,
             "required": ["columnId"],
             "properties": {
-              "columnId": { "type": "string", "pattern": "^lid_" },
-              "label": { "type": "string"},
+              "columnId": {"type": "string", "minLength": 1},
+              "label": {"type": "string"},
               "decorations": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "pk": { "type": "boolean", "default": false },
-                  "fk": { "type": "boolean", "default": false },
-                  "underline": { "type": "boolean", "default": false },
-                  "italic": { "type": "boolean", "default": false }
+                  "pk": {"type": "boolean", "default": false},
+                  "ck": {"type": "boolean", "default": false},
+                  "fk": {"type": "boolean", "default": false},
+                  "underline": {"type": "boolean", "description": "Legacy decoration."},
+                  "italic": {"type": "boolean", "description": "Legacy decoration."}
                 }
               }
             }
           }
         },
-
-        "text": {
-          "type": "string"
-        }
+        "text": {"type": "string"},
+        "data": {"type": "object", "additionalProperties": true, "description": "Annotation data or persisted physical table column/index data."}
       },
-
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "table" } } },
-          "then": { "required": ["tableId"] }
+          "if": {
+            "properties": {
+              "type": {"const": "table"}
+            }
+          },
+          "then": {
+            "required": ["tableId"]
+          }
         }
       ]
     },
-
     "edge": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "type", "source", "target"],
       "properties": {
-        "id": { "type": "string", "pattern": "^lid_" },
-        "type": { "type": "string", "enum": ["fk", "noteLink"] },
-
-        "source": { "type": "string", "pattern": "^lid_" },
-        "target": { "type": "string", "pattern": "^lid_" },
-
+        "id": {"type": "string", "minLength": 1},
+        "type": {
+          "type": "string",
+          "enum": ["fk", "noteLink"]
+        },
+        "source": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "sourceSide": {
+          "type": "string",
+          "enum": ["left", "right"]
+        },
+        "targetSide": {
+          "type": "string",
+          "enum": ["left", "right"]
+        },
         "points": {
           "type": "array",
-          "items": { "$ref": "#/$defs/point" }
+          "items": {"$ref": "#/$defs/point"}
         },
-
-        "style": { "$ref": "#/$defs/style" },
-
+        "style": {"$ref": "#/$defs/style"},
         "fkRef": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "tableId": { "type": "string", "pattern": "^lid_" },
-            "foreignKeyIndex": {
-              "type": "integer",
-              "minimum": 0
-            }
+            "tableId": {"type": "string", "minLength": 1},
+            "foreignKeyIndex": {"type": "integer", "minimum": 0}
           }
         },
-
         "labels": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "text": { "type": "string" },
-            "position": { "$ref": "#/$defs/point" }
+            "text": {"type": "string"},
+            "position": {"$ref": "#/$defs/point"}
           }
         }
       },
-
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "fk" } } },
-          "then": { "required": ["fkRef"] }
+          "if": {
+            "properties": {
+              "type": {"const": "fk"}
+            }
+          },
+          "then": {
+            "required": ["fkRef"]
+          }
         }
       ]
     }

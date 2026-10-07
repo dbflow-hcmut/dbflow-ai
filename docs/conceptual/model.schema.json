@@ -2,195 +2,146 @@
   "$schema": "https://json-schema.org/draft/2019-09/schema",
   "$id": "https://example.com/conceptual/model.schema.json",
   "title": "Conceptual ER/EER Model",
-  "description": "Matches the ConceptualModelPayload type in conceptual-model.builder.ts",
   "type": "object",
   "required": ["model", "entities", "relationships"],
   "additionalProperties": false,
-
   "properties": {
     "model": {
       "type": "object",
       "required": ["id", "name", "version"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^cid_" },
-        "name": { "type": "string", "minLength": 1 },
-        "version": { "type": "integer", "minimum": 1 },
-        "notes": { "type": "string" }
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 1},
+        "notes": {"type": "string"}
       }
     },
-
     "entities": {
       "type": "array",
-      "minItems": 1,
-      "items": { "$ref": "#/$defs/entity" }
+      "items": {"$ref": "#/$defs/entity"}
     },
-
     "relationships": {
       "type": "array",
-      "items": { "$ref": "#/$defs/relationship" }
+      "items": {"$ref": "#/$defs/relationship"}
     },
-
     "generalizations": {
       "type": "array",
-      "items": { "$ref": "#/$defs/generalization" }
+      "items": {"$ref": "#/$defs/generalization"}
     },
-
     "categories": {
       "type": "array",
-      "items": { "$ref": "#/$defs/category" }
+      "items": {"$ref": "#/$defs/category"}
     },
-
-    "constraints": {
-      "description": "Reserved for future use.",
-      "type": "array"
+    "notes": {"description": "General notes about the model.", "type": "string"},
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"}
     },
-
-    "notes": {
-      "description": "General notes about the model.",
-      "type": "string"
-    },
-
-    "tags": { "type": "array", "items": { "type": "string" } }
+    "constraints": {"description": "Reserved for future use.", "type": "array"}
   },
-
   "$defs": {
     "entity": {
-      "description": "ModelEntity — strong or weak entity with attributes.",
       "type": "object",
       "required": ["id", "name", "attributes"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^cid_" },
-
-        "name": { "type": "string" },
-
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
         "kind": {
           "type": "string",
           "enum": ["strong", "weak"],
           "default": "strong"
         },
-
         "attributes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/attribute" }
+          "items": {"$ref": "#/$defs/attribute"}
         },
-
-        "notes": { "type": "string" }
+        "notes": {"type": "string"}
       }
     },
-
     "attribute": {
-      "description": "ModelAttribute — entity or relationship attribute.",
+      "description": "Entity or relationship attribute.",
       "type": "object",
       "required": ["id", "name", "kind", "isKey"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^cid_" },
-
-        "name": { "type": "string" },
-
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
         "kind": {
           "type": "string",
           "enum": ["simple", "composite", "multi_valued", "complex", "derived"]
         },
-
-        "isKey": { "type": "boolean", "default": false },
-
-        "semantics": { "type": "array", "items": { "type": "string" } },
-
-        "components": {
-          "description": "Child attributes when kind = composite or complex.",
+        "isKey": {"type": "boolean", "default": false},
+        "semantics": {
           "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["id", "name", "kind"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "type": "string", "pattern": "^cid_" },
-              "name": { "type": "string" },
-              "kind": { "type": "string", "enum": ["simple"] }
-            }
-          }
+          "items": {"type": "string"}
         },
-
-        "derivation": {
-          "description": "Derivation formula when kind = derived.",
-          "type": "string"
+        "components": {
+          "description": "For composite/complex attributes.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/componentAttribute"}
         },
-
-        "notes": { "type": "string" }
+        "derivation": {"type": "string"},
+        "notes": {"type": "string"}
       }
     },
-
     "relationship": {
-      "description": "ModelRelationship — association or identifying relationship.",
       "type": "object",
       "required": ["id", "name", "type", "ends"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^cid_" },
-
-        "name": { "type": "string" },
-
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
         "type": {
           "type": "string",
           "enum": ["association", "identifying"],
           "default": "association"
         },
-
-        "arity": { "type": "integer", "minimum": 1 },
-
+        "arity": {"type": "integer", "minimum": 1},
         "ends": {
           "type": "array",
           "minItems": 2,
-          "items": { "$ref": "#/$defs/relEnd" }
+          "items": {"$ref": "#/$defs/relEnd"}
         },
-
         "attributes": {
           "description": "Attributes owned by the relationship (esp. n-ary).",
           "type": "array",
-          "items": { "$ref": "#/$defs/attribute" }
+          "items": {"$ref": "#/$defs/attribute"}
         },
-
-        "semantics": { "type": "string" },
-
-        "notes": { "type": "string" }
+        "semantics": {"type": "string"},
+        "notes": {"type": "string"}
       }
     },
-
     "relEnd": {
-      "description": "RelationshipEnd — one participating entity in a relationship.",
       "type": "object",
       "required": ["entityId"],
       "additionalProperties": false,
       "properties": {
-        "entityId": { "type": "string", "pattern": "^cid_" },
-
-        "role": { "type": "string" },
-
-        "cardinality": { "type": "string" },
-
-        "optional": { "type": "boolean" },
-
-        "notes": { "type": "string" }
+        "entityId": {"type": "string", "minLength": 1},
+        "role": {"type": "string"},
+        "cardinality": {"type": "string"},
+        "optional": {"type": "boolean"},
+        "notes": {"type": "string", "description": "Legacy end notes retained when editing existing models."}
       }
     },
-
     "generalization": {
-      "description": "ModelGeneralization — Subtype/Supertype (is-a).",
+      "description": "Subtype/Supertype (is-a).",
       "type": "object",
-      "required": ["id", "parentEntityId", "childEntityIds", "constraints"],
+      "required": ["id", "childEntityIds", "constraints"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^cid_" },
-        "parentEntityId": { "type": "string", "pattern": "^cid_" },
-        "childEntityIds": {
+        "id": {"type": "string", "minLength": 1},
+        "parentEntityIds": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string", "pattern": "^cid_" }
+          "items": {"type": "string", "minLength": 1}
         },
-        "categoryBy": { "type": "string" },
+        "childEntityIds": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "categoryBy": {"type": "string"},
         "constraints": {
           "type": "object",
           "required": ["disjointness", "completeness"],
@@ -205,32 +156,64 @@
               "enum": ["total", "partial"]
             }
           }
+        },
+        "parentEntityId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Legacy single-parent reference. Use parentEntityIds in new output."
         }
-      }
+      },
+      "anyOf": [
+        {
+          "required": ["parentEntityIds"]
+        },
+        {
+          "required": ["parentEntityId"]
+        }
+      ]
     },
-
     "category": {
-      "description": "ModelCategory — union type (category).",
       "type": "object",
-      "required": ["id", "categoryEntityId", "superclassEntityIds", "completeness"],
+      "required": ["id", "superclassEntityIds", "completeness"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^cid_" },
-
-        "categoryEntityId": { "type": "string", "pattern": "^cid_" },
-
+        "id": {"type": "string", "minLength": 1},
+        "categoryEntityId": {"type": "string", "minLength": 1},
         "superclassEntityIds": {
           "type": "array",
-          "minItems": 2,
-          "items": { "type": "string", "pattern": "^cid_" }
+          "items": {"type": "string", "minLength": 1}
         },
-
         "completeness": {
           "type": "string",
           "enum": ["total", "partial"]
         },
-
-        "notes": { "type": "string" }
+        "notes": {"type": "string"}
+      }
+    },
+    "componentAttribute": {
+      "description": "Nested attribute; legacy components may omit isKey.",
+      "type": "object",
+      "required": ["id", "name", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
+        "kind": {
+          "type": "string",
+          "enum": ["simple", "composite", "multi_valued", "complex", "derived"]
+        },
+        "isKey": {"type": "boolean", "default": false},
+        "semantics": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "components": {
+          "description": "For composite/complex attributes.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/componentAttribute"}
+        },
+        "derivation": {"type": "string"},
+        "notes": {"type": "string"}
       }
     }
   }

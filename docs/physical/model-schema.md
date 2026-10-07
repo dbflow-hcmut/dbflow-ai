@@ -14,10 +14,12 @@ The AI must produce output that conforms **exactly** to this specification.
 }
 ```
 
-- `model.id`: identifier for the schema (prefix `pid_`).
+- `model.id`: non-empty identifier for the schema; preserve existing IDs, including UUIDs.
 - `model.name`: human-readable name.
 - `model.version`: integer, start at `1`.
-- `tables`: array of table objects (at least 1).
+- `model.dbms`: optional target, exactly `postgresql`, `mysql`, or `sqlserver`.
+- `model.description`, `model.notes`: optional metadata; preserve on edits.
+- `tables`: array of table objects; may be empty for an empty canvas.
 
 ---
 
@@ -25,10 +27,13 @@ The AI must produce output that conforms **exactly** to this specification.
 
 | Field     | Type   | Required | Description                                      |
 |-----------|--------|----------|--------------------------------------------------|
-| `id`      | string | ✅       | Unique ID, prefix `pid_` (e.g. `pid_customer`).  |
+| `id`      | string | ✅       | Non-empty ID; new IDs use `pid_` (e.g. `pid_customer`).  |
 | `name`    | string | ✅       | Table name in **snake_case**.                    |
-| `columns` | array  | ✅       | At least 1 column.                               |
+| `columns` | array  | ✅       | Ordered columns; may be empty while editing.                               |
 | `indexes` | array  |          | Optional array of index definitions.             |
+| `functionalDependencies` | array | | Functional dependencies; see below. |
+| `showFunctionalDependencies` | boolean | | Whether to display FDs; default `false`. |
+| `comment` | string | | Table description. |
 | `notes`   | string |          | Optional notes.                                  |
 
 ---
@@ -37,15 +42,16 @@ The AI must produce output that conforms **exactly** to this specification.
 
 | Field           | Type    | Required | Description                                                                |
 |-----------------|---------|----------|----------------------------------------------------------------------------|
-| `id`            | string  | ✅       | Unique ID, prefix `pid_` (e.g. `pid_customer_email`).                     |
+| `id`            | string  | ✅       | Non-empty ID; new IDs use `pid_` (e.g. `pid_customer_email`).                     |
 | `name`          | string  | ✅       | Column name in **snake_case**.                                             |
-| `dataType`      | string  | ✅       | Base SQL data type **without length** (e.g. `varchar`, `integer`, `decimal`). |
+| `dataType`      | string  |          | Base SQL data type **without length** (e.g. `varchar`, `integer`, `decimal`). |
 | `length`        | string  |          | Length or precision (e.g. `"255"` for varchar(255), `"10,2"` for decimal). |
-| `nullable`      | boolean |          | Allow NULL (default `true`).                                               |
-| `unique`        | boolean |          | UNIQUE constraint (default `false`).                                       |
+| `nullable`      | boolean | ✅       | Allow NULL (default `true`).                                               |
+| `unique`        | boolean | ✅       | UNIQUE constraint (default `false`).                                       |
 | `autoIncrement` | boolean |          | Auto-increment / identity column (default `false`).                        |
 | `defaultValue`  | string  |          | SQL default expression (e.g. `"NOW()"`, `"0"`, `"true"`).                 |
 | `roles`         | object  |          | Key roles (see below).                                                     |
+| `comment`       | string  |          | Column description. |
 | `notes`         | string  |          | Optional notes.                                                            |
 
 ### IMPORTANT: `dataType` vs `length` separation
@@ -72,8 +78,8 @@ The `dataType` field stores ONLY the base type name. Length/precision goes in th
 
 | Field        | Type   | Required | Description                                            |
 |--------------|--------|----------|--------------------------------------------------------|
-| `refTableId` | string | ✅       | ID of the referenced table (prefix `pid_`).            |
-| `refColumnId`| string | ✅       | ID of the referenced column (prefix `pid_`).           |
+| `refTableId` | string | ✅       | Exact existing table ID.            |
+| `refColumnId`| string | ✅       | Exact existing column ID.           |
 | `onDelete`   | string |          | Action on delete: `NO ACTION`, `CASCADE`, `SET NULL`, `SET DEFAULT`, `RESTRICT`. Default: `NO ACTION`. |
 | `onUpdate`   | string |          | Action on update: `NO ACTION`, `CASCADE`, `SET NULL`, `SET DEFAULT`, `RESTRICT`. Default: `NO ACTION`. |
 
@@ -85,7 +91,7 @@ The `dataType` field stores ONLY the base type name. Length/precision goes in th
 |-----------|---------|----------|----------------------------------------------------------|
 | `id`      | string  | ✅       | Unique ID for the index.                                 |
 | `name`    | string  | ✅       | Index name (e.g. `idx_customer_email`).                  |
-| `type`    | string  | ✅       | Index type: `BTREE`, `HASH`, `GIN`, `GIST`, `BRIN`.     |
+| `type`    | string  | ✅       | Index type: `BTREE`, `HASH`, `GIN`, `GIST`, `BRIN`, `CLUSTERED`, `NONCLUSTERED`.     |
 | `columns` | array   | ✅       | Ordered list of columns in the index.                    |
 | `isUnique`| boolean |          | Whether this is a unique index (default `false`).        |
 
@@ -100,11 +106,11 @@ The `dataType` field stores ONLY the base type name. Length/precision goes in th
 
 ## ID Naming Conventions (CRITICAL)
 
-All IDs **MUST** start with `pid_` (physical ID prefix).
+All persisted IDs and references are non-empty strings. Preserve existing IDs (including UUIDs); use `pid_` for newly generated table/column/FD IDs. Index IDs may use `idx_`.
 
 - Table IDs: `pid_{table_name}` (e.g. `pid_customer`, `pid_order`).
 - Column IDs: `pid_{table_name}_{column_name}` (e.g. `pid_customer_email`, `pid_order_id`).
-  - **Every column ID MUST include the table name** to guarantee global uniqueness.
+  - **Every newly generated column ID MUST include the table name** to guarantee global uniqueness.
 - Index IDs: `idx_{table_name}_{description}` (e.g. `idx_customer_email`).
 
 ---
@@ -149,6 +155,29 @@ All IDs **MUST** start with `pid_` (physical ID prefix).
 10. **PK columns**: set `nullable: false`, `unique: true`, use `autoIncrement: true` or `uuid`.
 11. **Timestamps**: include `created_at` and `updated_at` with type `timestamptz` and `defaultValue: "NOW()"` where appropriate.
 12. **Naming**: use clear, descriptive **snake_case** names.
+
+---
+
+## `functionalDependency`
+
+| Field | Type | Required for new output | Description |
+|---|---|---|---|
+| `id` | string | Yes | Stable, non-empty FD identifier. |
+| `left` | array of strings | Yes | Determinant column IDs or names. |
+| `right` | array of strings | Yes | Dependent column IDs or names. |
+| `name` | string | No | Descriptive name. |
+| `notes` | string | No | Additional notes. |
+
+FD sides may be empty in a partially edited model. FDs describe dependencies; they do not define SQL constraints.
+
+## Output rules
+
+- Include `nullable` and `unique` on every new column and `id` on every new FD. Older payloads may omit these fields.
+- A complete physical design must give every column a non-empty `dataType`.
+- Use exactly `postgresql`, `mysql`, or `sqlserver` for `model.dbms`.
+- Use column `roles` for PK/FK constraints and separate `dataType`/`length` for types.
+- Preserve existing IDs, FD arrays, FD visibility, comments, notes, and model metadata unless the requested edit changes them.
+- Emit only fields defined in the accompanying `model.schema.json`.
 
 ---
 

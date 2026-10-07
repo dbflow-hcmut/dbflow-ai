@@ -169,6 +169,11 @@ Before producing the final JSON, verify:
 3. The schema appropriately covers the described business domain.
 4. **ALL IDs are globally unique** — no two objects share the same ``id`` value.
 5. IDs include the entity/table name (e.g. ``lid_student_name``, NOT ``lid_name``).
+6. Every weak entity preserves its identifying semantics: it has a partial key, an identifying
+   owner relationship with total participation, and—at relational levels—the owner's PK/FK
+   columns plus the partial-key columns form the weak table's composite primary key.
+7. No surrogate ``id`` replaces a weak entity's owner-key + partial-key identity unless the
+   user explicitly asks to change that entity into an independently identified entity.
 
 ## Output — MANDATORY FORMAT
 This format applies only when you decided to generate in Step 2 above. If \
@@ -225,7 +230,11 @@ every field, every ID pattern, every enum value.
 LEVEL_INSTRUCTIONS = {
     "conceptual": """\
 ### Conceptual-level design rules
-- Every entity MUST have a **primary key** attribute (``isKey: true``).
+- Every **strong** entity MUST have a complete primary key attribute (``isKey: true``).
+- A **weak** entity does not have a complete standalone key. Its local discriminator(s)
+  are its **partial key**. Because this JSON format has no separate ``isPartialKey`` field,
+  mark every partial-key attribute with ``isKey: true``; for an entity with ``kind: "weak"``,
+  ``isKey`` means a partial key that is only complete together with the owner's key.
 - Include domain-relevant attributes.  Think about applicable categories:
   - **Identifiers**: primary key, natural keys, codes, slugs
   - **Core data**: names, titles, descriptions, content
@@ -251,7 +260,17 @@ LEVEL_INSTRUCTIONS = {
 - If the relationship itself carries data, add ``attributes`` to the relationship.
 
 ### Advanced constructs (use when appropriate)
-- **Weak entities**: set ``kind: "weak"`` on the entity, use an ``identifying`` relationship.
+- **Weak entities**: use them when an entity's existence and identity depend on an owner.
+  Set ``kind: "weak"``; mark all local discriminator/partial-key attributes with
+  ``isKey: true``; and create an ``identifying`` relationship to the strong owner.
+- The weak entity MUST participate totally in its identifying relationship
+  (its relationship end has ``optional: false``). The owner side is normally ``1`` and
+  the weak side ``N``. Do not add a standalone surrogate ``id`` that turns the weak entity
+  into a strong entity unless the user explicitly requests independent identity.
+- Example: if ``Issue`` is owned by ``Publication`` and is distinguished within a
+  publication by ``issue_number`` + ``date_issued``, set both attributes as ``isKey: true``
+  partial-key attributes and connect ``Issue`` to ``Publication`` through an identifying
+  relationship. Neither attribute alone is the complete identity of ``Issue``.
 - **Generalisation / ISA**: fill the ``generalizations`` array with \
   ``parentEntityId``, ``childEntityIds``, and ``constraints`` (disjoint/overlap, total/partial).
 - **Category / Union**: fill the ``categories`` array.
@@ -268,6 +287,15 @@ LEVEL_INSTRUCTIONS = {
   - For M:N: create a **junction table** with composite PK (both FK columns have ``primaryKey: true``).
   - For 1:1: add an FK column in one side with ``unique: true``.
 - FK columns MUST have ``roles.foreignKey`` with valid ``refTableId`` and ``refColumnId``.
+- **Weak-entity mapping is mandatory**: migrate every column of the owner's primary key into
+  the weak table. Each migrated owner-key column is both a foreign key to the owner and part
+  of the weak table's primary key. Add every partial-key/discriminator column to that same
+  primary key. Thus ``weak PK = owner PK + all partial-key columns``.
+- Example: ``Publication(publication_id PK)`` owning weak ``Issue`` with partial key
+  ``(issue_number, date_issued)`` maps to ``Issue(publication_id PK/FK, issue_number PK,
+  date_issued PK, ...)`` with composite PK ``(publication_id, issue_number, date_issued)``.
+  Do NOT generate an independent ``issue_id`` as the sole PK unless the user explicitly
+  requests changing the weak entity to have independent identity.
 - Aim for **3NF** normalisation — avoid redundant/derived columns.
 - Include domain-relevant columns:
   - **Identifiers**: primary key (auto-increment ID or natural key)
@@ -276,7 +304,9 @@ LEVEL_INSTRUCTIONS = {
   - **Status/flags**: status, is_active
   - **Quantities**: amount, count, price
   - **Domain-specific**: any column a real business would need
-- PK columns: set ``nullable: false``, ``unique: true``.
+- PK columns: set ``nullable: false``. For a single-column PK, set ``unique: true``.
+  For a composite PK, do NOT make each component individually unique; use ``unique: false``
+  unless that component is independently unique by a separate business constraint.
 - FK columns: set ``nullable: false`` for mandatory relationships.
 - DO NOT include ``entities``, ``relationships``, ``generalizations``, or ``categories`` — those are conceptual-level only.
 """,
@@ -305,12 +335,21 @@ LEVEL_INSTRUCTIONS = {
     - ``SET NULL``: for optional references (e.g. assigned_to when user is deleted).
     - ``RESTRICT``: to prevent deletion of referenced records.
     - ``NO ACTION``: default, same as RESTRICT in most DBMS.
+- **Weak-entity mapping is mandatory**: include every owner-PK column in the weak table as
+  a non-null FK and PK component, then combine it with every partial-key/discriminator column
+  to form the composite PK. For example, weak ``Issue`` owned by ``Publication`` with partial
+  key ``(issue_number, date_issued)`` becomes composite PK
+  ``(publication_id, issue_number, date_issued)``; ``publication_id`` is also the FK.
+  Never replace this identity with an auto-increment/UUID ``issue_id`` unless the user
+  explicitly requests independent identity instead of weak-entity semantics.
 - **Indexes**: add ``indexes`` array on tables for frequently queried columns:
   - Each index has: ``id``, ``name``, ``type`` (BTREE/HASH/GIN/GIST/BRIN), ``columns`` (with ``columnName`` and ``order`` ASC/DESC), ``isUnique``.
   - FK columns SHOULD have a BTREE index.
   - Unique business keys SHOULD have a unique index.
   - Columns used in WHERE/JOIN/ORDER BY SHOULD be indexed.
-- Set ``nullable: false`` for PK and mandatory FK columns. Set ``unique: true`` for PK and unique columns.
+- Set ``nullable: false`` for PK and mandatory FK columns. Set ``unique: true`` on a
+  single-column PK and independently unique business columns. Composite-PK components use
+  ``unique: false`` unless a component is independently unique; the PK tuple provides uniqueness.
 - Include domain-relevant columns with appropriate data types:
   - **Identifiers**: ``integer`` or ``uuid`` primary keys with ``autoIncrement: true``
   - **Text**: ``varchar`` with ``length`` for bounded, ``text`` for unbounded
